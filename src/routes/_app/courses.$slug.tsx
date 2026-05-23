@@ -135,7 +135,7 @@ function CourseDetail() {
         <aside className="rounded-2xl border bg-card p-4">
           <h3 className="px-2 py-1 text-sm font-semibold">Lessons</h3>
           <ul className="mt-2 space-y-1">
-            {lessons.map((l: { id: string; title: string; order_index: number; duration_minutes: number }) => {
+            {lessons.map((l: { id: string; title: string; order_index: number; duration_minutes: number | null }) => {
               const done = completedIds.has(l.id);
               const isActive = active?.id === l.id;
               return (
