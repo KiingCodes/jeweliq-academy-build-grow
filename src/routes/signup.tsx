@@ -7,7 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AuthShell } from "./login";
+import { AuthShell, Divider } from "./login";
+import { GoogleButton } from "@/components/GoogleButton";
 
 export const Route = createFileRoute("/signup")({
   component: SignupPage,
@@ -47,6 +48,8 @@ function SignupPage() {
   };
 
   return <AuthShell title="Start learning today" subtitle="Free forever plan. No credit card required.">
+    <GoogleButton label="Sign up with Google" />
+    <Divider />
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="name">Name</Label>

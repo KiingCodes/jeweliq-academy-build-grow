@@ -1,12 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "@/components/Logo";
+import { GoogleButton } from "@/components/GoogleButton";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -37,13 +39,18 @@ function LoginPage() {
   };
 
   return <AuthShell title="Welcome back" subtitle="Sign in to continue learning.">
+    <GoogleButton label="Sign in with Google" />
+    <Divider />
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-1.5">
         <Label htmlFor="email">Email</Label>
         <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-primary">Forgot?</Link>
+        </div>
         <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
       </div>
       <Button type="submit" disabled={loading} className="bg-gradient-brand w-full text-primary-foreground border-0">
@@ -56,16 +63,21 @@ function LoginPage() {
   </AuthShell>;
 }
 
+export function Divider() {
+  return (
+    <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted-foreground">
+      <div className="h-px flex-1 bg-border" /> or <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
 export function AuthShell({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <div className="relative flex min-h-screen items-center justify-center px-4 py-12">
-      <div aria-hidden className="absolute inset-0 -z-10 opacity-60" style={{ background: "radial-gradient(60% 50% at 50% 0%, oklch(0.85 0.12 285 / 0.35), transparent 70%)" }} />
+      <div aria-hidden className="absolute inset-0 -z-10 opacity-60" style={{ background: "radial-gradient(60% 50% at 50% 0%, oklch(0.55 0.2 260 / 0.25), transparent 70%), radial-gradient(40% 40% at 80% 80%, oklch(0.72 0.19 52 / 0.2), transparent 70%)" }} />
       <div className="w-full max-w-md">
-        <Link to="/" className="mb-8 flex items-center justify-center gap-2">
-          <div className="bg-gradient-brand flex h-9 w-9 items-center justify-center rounded-lg shadow-soft">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="font-display text-lg font-semibold">JewelIQ Academy</span>
+        <Link to="/" className="mb-8 flex items-center justify-center">
+          <Logo className="h-10 w-auto" />
         </Link>
         <div className="glass rounded-2xl p-8 shadow-glow">
           <h1 className="font-display text-2xl font-semibold tracking-tight">{title}</h1>
