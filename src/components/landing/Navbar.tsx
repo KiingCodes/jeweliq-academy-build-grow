@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { Sparkles, LogOut, User as UserIcon, LayoutDashboard } from "lucide-react";
+import { LogOut, User as UserIcon, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/hooks/use-session";
 import { supabase } from "@/integrations/supabase/client";
+import { Logo } from "@/components/Logo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,10 +25,7 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full px-3">
       <div className="glass mx-auto mt-3 flex h-14 max-w-6xl items-center justify-between rounded-full px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-2">
-          <div className="bg-gradient-brand flex h-8 w-8 items-center justify-center rounded-lg shadow-soft">
-            <Sparkles className="h-4 w-4 text-primary-foreground" />
-          </div>
-          <span className="font-display text-base font-semibold tracking-tight">JewelIQ Academy</span>
+          <Logo className="h-8 w-auto" />
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
           <Link to="/courses" className="hover:text-foreground transition-colors">Courses</Link>

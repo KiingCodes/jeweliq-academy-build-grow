@@ -1,14 +1,16 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Loader2, Sparkles, LayoutDashboard, BookOpen, Code2, Bot, LogOut } from "lucide-react";
+import { Loader2, LayoutDashboard, BookOpen, Code2, Bot, LogOut, Shield, GraduationCap } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
+import { useRoles } from "@/hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
+import { Logo } from "@/components/Logo";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
 });
 
-const nav = [
+const baseNav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/courses", label: "Courses", icon: BookOpen },
   { to: "/playground", label: "Playground", icon: Code2 },
@@ -17,6 +19,7 @@ const nav = [
 
 function AppLayout() {
   const { user, loading } = useSession();
+  const { isAdmin, isInstructor } = useRoles();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -32,15 +35,18 @@ function AppLayout() {
     );
   }
 
+  const nav = [
+    ...baseNav,
+    ...(isInstructor ? [{ to: "/instructor", label: "Instructor", icon: GraduationCap } as const] : []),
+    ...(isAdmin ? [{ to: "/admin", label: "Admin", icon: Shield } as const] : []),
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <div className="mx-auto flex max-w-7xl">
         <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r bg-card/40 p-5 lg:block">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="bg-gradient-brand flex h-8 w-8 items-center justify-center rounded-lg shadow-soft">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-display font-semibold">JewelIQ</span>
+          <Link to="/" className="flex items-center">
+            <Logo className="h-9 w-auto" />
           </Link>
           <nav className="mt-8 space-y-1">
             {nav.map((item) => {
@@ -78,9 +84,8 @@ function AppLayout() {
         {/* mobile top bar */}
         <div className="lg:hidden fixed inset-x-0 top-0 z-40 border-b bg-card/80 backdrop-blur">
           <div className="flex items-center justify-between px-4 py-3">
-            <Link to="/" className="flex items-center gap-2">
-              <div className="bg-gradient-brand flex h-7 w-7 items-center justify-center rounded-md"><Sparkles className="h-3.5 w-3.5 text-primary-foreground" /></div>
-              <span className="font-display text-sm font-semibold">JewelIQ</span>
+            <Link to="/" className="flex items-center">
+              <Logo className="h-7 w-auto" />
             </Link>
             <button onClick={async () => { await supabase.auth.signOut(); navigate({ to: "/" }); }}
               className="text-xs text-muted-foreground"><LogOut className="h-4 w-4" /></button>
