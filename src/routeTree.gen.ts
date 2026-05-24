@@ -17,7 +17,9 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppTutorRouteImport } from './routes/_app/tutor'
 import { Route as AppPlaygroundRouteImport } from './routes/_app/playground'
+import { Route as AppInstructorRouteImport } from './routes/_app/instructor'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppCoursesIndexRouteImport } from './routes/_app/courses.index'
 import { Route as AppCoursesSlugRouteImport } from './routes/_app/courses.$slug'
 
@@ -60,9 +62,19 @@ const AppPlaygroundRoute = AppPlaygroundRouteImport.update({
   path: '/playground',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInstructorRoute = AppInstructorRouteImport.update({
+  id: '/instructor',
+  path: '/instructor',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAdminRoute = AppAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => AppRoute,
 } as any)
 const AppCoursesIndexRoute = AppCoursesIndexRouteImport.update({
@@ -82,7 +94,9 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/admin': typeof AppAdminRoute
   '/dashboard': typeof AppDashboardRoute
+  '/instructor': typeof AppInstructorRoute
   '/playground': typeof AppPlaygroundRoute
   '/tutor': typeof AppTutorRoute
   '/courses/$slug': typeof AppCoursesSlugRoute
@@ -94,7 +108,9 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/admin': typeof AppAdminRoute
   '/dashboard': typeof AppDashboardRoute
+  '/instructor': typeof AppInstructorRoute
   '/playground': typeof AppPlaygroundRoute
   '/tutor': typeof AppTutorRoute
   '/courses/$slug': typeof AppCoursesSlugRoute
@@ -108,7 +124,9 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/_app/admin': typeof AppAdminRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/instructor': typeof AppInstructorRoute
   '/_app/playground': typeof AppPlaygroundRoute
   '/_app/tutor': typeof AppTutorRoute
   '/_app/courses/$slug': typeof AppCoursesSlugRoute
@@ -122,7 +140,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/admin'
     | '/dashboard'
+    | '/instructor'
     | '/playground'
     | '/tutor'
     | '/courses/$slug'
@@ -134,7 +154,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/admin'
     | '/dashboard'
+    | '/instructor'
     | '/playground'
     | '/tutor'
     | '/courses/$slug'
@@ -147,7 +169,9 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/_app/admin'
     | '/_app/dashboard'
+    | '/_app/instructor'
     | '/_app/playground'
     | '/_app/tutor'
     | '/_app/courses/$slug'
@@ -221,11 +245,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppPlaygroundRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/instructor': {
+      id: '/_app/instructor'
+      path: '/instructor'
+      fullPath: '/instructor'
+      preLoaderRoute: typeof AppInstructorRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AppDashboardRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/admin': {
+      id: '/_app/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AppAdminRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/courses/': {
@@ -246,7 +284,9 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppAdminRoute: typeof AppAdminRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppInstructorRoute: typeof AppInstructorRoute
   AppPlaygroundRoute: typeof AppPlaygroundRoute
   AppTutorRoute: typeof AppTutorRoute
   AppCoursesSlugRoute: typeof AppCoursesSlugRoute
@@ -254,7 +294,9 @@ interface AppRouteChildren {
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppAdminRoute: AppAdminRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppInstructorRoute: AppInstructorRoute,
   AppPlaygroundRoute: AppPlaygroundRoute,
   AppTutorRoute: AppTutorRoute,
   AppCoursesSlugRoute: AppCoursesSlugRoute,
