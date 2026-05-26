@@ -39,7 +39,7 @@ function CommunityPage() {
 
   const submit = async () => {
     if (!user || !title.trim()) return;
-    const { error } = await supabase.from("discussions" as never).insert({ user_id: user.id, title, body });
+    const { error } = await supabase.from("discussions" as never).insert([{ user_id: user.id, title, body }] as any);
     if (error) return toast.error(error.message);
     setTitle(""); setBody(""); setOpen(false);
     qc.invalidateQueries({ queryKey: ["discussions"] });
@@ -123,13 +123,13 @@ function PostCard({ post }: { post: { id: string; title: string; body: string; c
 
   const react = async () => {
     if (!user) return;
-    await supabase.from("reactions" as never).insert({ user_id: user.id, discussion_id: post.id, emoji: "❤️" });
+    await supabase.from("reactions" as never).insert([{ user_id: user.id, discussion_id: post.id, emoji: "❤️" }] as any);
     qc.invalidateQueries({ queryKey: ["discussions"] });
   };
 
   const postComment = async () => {
     if (!user || !comment.trim()) return;
-    await supabase.from("comments" as never).insert({ user_id: user.id, discussion_id: post.id, body: comment });
+    await supabase.from("comments" as never).insert([{ user_id: user.id, discussion_id: post.id, body: comment }] as any);
     setComment("");
     qc.invalidateQueries({ queryKey: ["comments", post.id] });
     qc.invalidateQueries({ queryKey: ["discussions"] });

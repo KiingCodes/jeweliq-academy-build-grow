@@ -68,7 +68,7 @@ function AdminDashboard() {
   const [annBody, setAnnBody] = useState("");
   const postAnn = async () => {
     if (!annTitle.trim()) return;
-    const { error } = await supabase.from("announcements" as never).insert({ title: annTitle, body: annBody });
+    const { error } = await supabase.from("announcements" as never).insert([{ title: annTitle, body: annBody }] as any);
     if (error) return toast.error(error.message);
     setAnnTitle(""); setAnnBody("");
     toast.success("Announcement published");
