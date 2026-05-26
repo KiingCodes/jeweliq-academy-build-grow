@@ -38,6 +38,30 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          id: string
+          title: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          title?: string
+        }
+        Relationships: []
+      }
       bookmarks: {
         Row: {
           created_at: string
@@ -66,6 +90,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      certificates: {
+        Row: {
+          cert_code: string
+          course_id: string
+          id: string
+          issued_at: string
+          user_id: string
+        }
+        Insert: {
+          cert_code?: string
+          course_id: string
+          id?: string
+          issued_at?: string
+          user_id: string
+        }
+        Update: {
+          cert_code?: string
+          course_id?: string
+          id?: string
+          issued_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       code_snippets: {
         Row: {
@@ -96,6 +144,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      comments: {
+        Row: {
+          body: string
+          created_at: string
+          discussion_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          discussion_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          discussion_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_discussion_id_fkey"
+            columns: ["discussion_id"]
+            isOneToOne: false
+            referencedRelation: "discussions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       courses: {
         Row: {
@@ -133,6 +213,30 @@ export type Database = {
           slug?: string
           thumbnail_hue?: string | null
           title?: string
+        }
+        Relationships: []
+      }
+      discussions: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          id?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          title?: string
+          user_id?: string
         }
         Relationships: []
       }
@@ -355,6 +459,38 @@ export type Database = {
             columns: ["lesson_id"]
             isOneToOne: false
             referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reactions: {
+        Row: {
+          created_at: string
+          discussion_id: string
+          emoji: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          discussion_id: string
+          emoji?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          discussion_id?: string
+          emoji?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reactions_discussion_id_fkey"
+            columns: ["discussion_id"]
+            isOneToOne: false
+            referencedRelation: "discussions"
             referencedColumns: ["id"]
           },
         ]

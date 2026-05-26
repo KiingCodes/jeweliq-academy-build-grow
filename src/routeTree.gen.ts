@@ -15,10 +15,13 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
 import { Route as AppTutorRouteImport } from './routes/_app/tutor'
 import { Route as AppPlaygroundRouteImport } from './routes/_app/playground'
 import { Route as AppInstructorRouteImport } from './routes/_app/instructor'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppCommunityRouteImport } from './routes/_app/community'
+import { Route as AppCertificatesRouteImport } from './routes/_app/certificates'
 import { Route as AppAdminRouteImport } from './routes/_app/admin'
 import { Route as AppCoursesIndexRouteImport } from './routes/_app/courses.index'
 import { Route as AppCoursesSlugRouteImport } from './routes/_app/courses.$slug'
@@ -52,6 +55,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyCodeRoute = VerifyCodeRouteImport.update({
+  id: '/verify/$code',
+  path: '/verify/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppTutorRoute = AppTutorRouteImport.update({
   id: '/tutor',
   path: '/tutor',
@@ -70,6 +78,16 @@ const AppInstructorRoute = AppInstructorRouteImport.update({
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCommunityRoute = AppCommunityRouteImport.update({
+  id: '/community',
+  path: '/community',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCertificatesRoute = AppCertificatesRouteImport.update({
+  id: '/certificates',
+  path: '/certificates',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAdminRoute = AppAdminRouteImport.update({
@@ -95,10 +113,13 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AppAdminRoute
+  '/certificates': typeof AppCertificatesRoute
+  '/community': typeof AppCommunityRoute
   '/dashboard': typeof AppDashboardRoute
   '/instructor': typeof AppInstructorRoute
   '/playground': typeof AppPlaygroundRoute
   '/tutor': typeof AppTutorRoute
+  '/verify/$code': typeof VerifyCodeRoute
   '/courses/$slug': typeof AppCoursesSlugRoute
   '/courses/': typeof AppCoursesIndexRoute
 }
@@ -109,10 +130,13 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/admin': typeof AppAdminRoute
+  '/certificates': typeof AppCertificatesRoute
+  '/community': typeof AppCommunityRoute
   '/dashboard': typeof AppDashboardRoute
   '/instructor': typeof AppInstructorRoute
   '/playground': typeof AppPlaygroundRoute
   '/tutor': typeof AppTutorRoute
+  '/verify/$code': typeof VerifyCodeRoute
   '/courses/$slug': typeof AppCoursesSlugRoute
   '/courses': typeof AppCoursesIndexRoute
 }
@@ -125,10 +149,13 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/_app/admin': typeof AppAdminRoute
+  '/_app/certificates': typeof AppCertificatesRoute
+  '/_app/community': typeof AppCommunityRoute
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/instructor': typeof AppInstructorRoute
   '/_app/playground': typeof AppPlaygroundRoute
   '/_app/tutor': typeof AppTutorRoute
+  '/verify/$code': typeof VerifyCodeRoute
   '/_app/courses/$slug': typeof AppCoursesSlugRoute
   '/_app/courses/': typeof AppCoursesIndexRoute
 }
@@ -141,10 +168,13 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin'
+    | '/certificates'
+    | '/community'
     | '/dashboard'
     | '/instructor'
     | '/playground'
     | '/tutor'
+    | '/verify/$code'
     | '/courses/$slug'
     | '/courses/'
   fileRoutesByTo: FileRoutesByTo
@@ -155,10 +185,13 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/admin'
+    | '/certificates'
+    | '/community'
     | '/dashboard'
     | '/instructor'
     | '/playground'
     | '/tutor'
+    | '/verify/$code'
     | '/courses/$slug'
     | '/courses'
   id:
@@ -170,10 +203,13 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/signup'
     | '/_app/admin'
+    | '/_app/certificates'
+    | '/_app/community'
     | '/_app/dashboard'
     | '/_app/instructor'
     | '/_app/playground'
     | '/_app/tutor'
+    | '/verify/$code'
     | '/_app/courses/$slug'
     | '/_app/courses/'
   fileRoutesById: FileRoutesById
@@ -185,6 +221,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  VerifyCodeRoute: typeof VerifyCodeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -231,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verify/$code': {
+      id: '/verify/$code'
+      path: '/verify/$code'
+      fullPath: '/verify/$code'
+      preLoaderRoute: typeof VerifyCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/tutor': {
       id: '/_app/tutor'
       path: '/tutor'
@@ -259,6 +303,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/community': {
+      id: '/_app/community'
+      path: '/community'
+      fullPath: '/community'
+      preLoaderRoute: typeof AppCommunityRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/certificates': {
+      id: '/_app/certificates'
+      path: '/certificates'
+      fullPath: '/certificates'
+      preLoaderRoute: typeof AppCertificatesRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/admin': {
       id: '/_app/admin'
       path: '/admin'
@@ -285,6 +343,8 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAdminRoute: typeof AppAdminRoute
+  AppCertificatesRoute: typeof AppCertificatesRoute
+  AppCommunityRoute: typeof AppCommunityRoute
   AppDashboardRoute: typeof AppDashboardRoute
   AppInstructorRoute: typeof AppInstructorRoute
   AppPlaygroundRoute: typeof AppPlaygroundRoute
@@ -295,6 +355,8 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAdminRoute: AppAdminRoute,
+  AppCertificatesRoute: AppCertificatesRoute,
+  AppCommunityRoute: AppCommunityRoute,
   AppDashboardRoute: AppDashboardRoute,
   AppInstructorRoute: AppInstructorRoute,
   AppPlaygroundRoute: AppPlaygroundRoute,
@@ -312,6 +374,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  VerifyCodeRoute: VerifyCodeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
