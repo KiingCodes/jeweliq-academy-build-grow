@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.maybe_issue_certificate() FROM public, anon, authenticated;
