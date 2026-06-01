@@ -17,6 +17,8 @@ export function useRoles() {
   return {
     roles: q.data ?? [],
     isLoading: q.isLoading,
+    isError: q.isError,
+    error: q.error,
     isAdmin: (q.data ?? []).includes("admin"),
     isInstructor: (q.data ?? []).includes("instructor"),
   };
