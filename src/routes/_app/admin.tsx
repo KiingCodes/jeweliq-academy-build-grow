@@ -75,6 +75,18 @@ function AdminDashboard() {
     toast.success("Announcement published");
   };
 
+  // enroll students
+  const [enrollUser, setEnrollUser] = useState("");
+  const [enrollCourse, setEnrollCourse] = useState("");
+  const enrollStudent = async () => {
+    if (!enrollUser || !enrollCourse) return toast.error("Pick a student and a course");
+    const { error } = await supabase.from("enrollments").insert({ user_id: enrollUser, course_id: enrollCourse });
+    if (error) return toast.error(error.message);
+    toast.success("Student enrolled");
+    qc.invalidateQueries({ queryKey: ["admin-stats"] });
+    setEnrollUser(""); setEnrollCourse("");
+  };
+
   if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />;
 
   if (!isAdmin) {
