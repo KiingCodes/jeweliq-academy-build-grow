@@ -133,9 +133,29 @@ function AdminDashboard() {
         <TabsList>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="courses">Courses</TabsTrigger>
+          <TabsTrigger value="enroll">Enroll</TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
           <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="enroll" className="mt-4">
+          <div className="glass space-y-3 rounded-2xl p-5">
+            <h3 className="font-semibold">Enroll a student in a course</h3>
+            <Select value={enrollUser} onValueChange={setEnrollUser}>
+              <SelectTrigger><SelectValue placeholder="Select student" /></SelectTrigger>
+              <SelectContent>
+                {users?.map((u) => (<SelectItem key={u.id} value={u.id}>{u.display_name ?? u.id.slice(0, 8)}</SelectItem>))}
+              </SelectContent>
+            </Select>
+            <Select value={enrollCourse} onValueChange={setEnrollCourse}>
+              <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
+              <SelectContent>
+                {courses?.map((c) => (<SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>))}
+              </SelectContent>
+            </Select>
+            <Button onClick={enrollStudent} className="bg-gradient-brand text-primary-foreground border-0"><Plus className="mr-1 h-4 w-4" />Enroll student</Button>
+          </div>
+        </TabsContent>
 
         <TabsContent value="users" className="mt-4">
           <div className="glass overflow-x-auto rounded-2xl">
