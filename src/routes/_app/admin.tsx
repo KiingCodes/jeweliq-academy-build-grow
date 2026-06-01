@@ -1,7 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Shield, Users, BookOpen, Activity, DollarSign, Loader2, Lock, Megaphone, Plus } from "lucide-react";
+import {
+  Shield,
+  Users,
+  BookOpen,
+  Activity,
+  DollarSign,
+  Loader2,
+  Lock,
+  Megaphone,
+  Plus,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoles } from "@/hooks/use-roles";
@@ -23,13 +33,19 @@ function AdminDashboard() {
     queryKey: ["admin-stats"],
     enabled: isAdmin,
     queryFn: async () => {
-      const [{ count: courses }, { count: profiles }, { count: enrollments }, { count: certs }] = await Promise.all([
-        supabase.from("courses").select("*", { count: "exact", head: true }),
-        supabase.from("profiles").select("*", { count: "exact", head: true }),
-        supabase.from("enrollments").select("*", { count: "exact", head: true }),
-        supabase.from("certificates" as never).select("*", { count: "exact", head: true }),
-      ]);
-      return { courses: courses ?? 0, users: profiles ?? 0, enrollments: enrollments ?? 0, certs: certs ?? 0 };
+      const [{ count: courses }, { count: profiles }, { count: enrollments }, { count: certs }] =
+        await Promise.all([
+          supabase.from("courses").select("*", { count: "exact", head: true }),
+          supabase.from("profiles").select("*", { count: "exact", head: true }),
+          supabase.from("enrollments").select("*", { count: "exact", head: true }),
+          supabase.from("certificates").select("*", { count: "exact", head: true }),
+        ]);
+      return {
+        courses: courses ?? 0,
+        users: profiles ?? 0,
+        enrollments: enrollments ?? 0,
+        certs: certs ?? 0,
+      };
     },
   });
 
@@ -37,10 +53,18 @@ function AdminDashboard() {
     queryKey: ["admin-users"],
     enabled: isAdmin,
     queryFn: async () => {
-      const { data: profiles } = await supabase.from("profiles").select("id, display_name, xp, streak_days, created_at").order("created_at", { ascending: false }).limit(50);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, display_name, xp, streak_days, created_at")
+        .order("created_at", { ascending: false })
+        .limit(50);
       const { data: roles } = await supabase.from("user_roles").select("user_id, role");
       const roleMap = new Map<string, string[]>();
-      roles?.forEach((r) => { const list = roleMap.get(r.user_id) ?? []; list.push(r.role); roleMap.set(r.user_id, list); });
+      roles?.forEach((r) => {
+        const list = roleMap.get(r.user_id) ?? [];
+        list.push(r.role);
+        roleMap.set(r.user_id, list);
+      });
       return (profiles ?? []).map((p) => ({ ...p, roles: roleMap.get(p.id) ?? [] }));
     },
   });
@@ -48,7 +72,9 @@ function AdminDashboard() {
   const { data: courses } = useQuery({
     queryKey: ["admin-courses"],
     enabled: isAdmin,
-    queryFn: async () => (await supabase.from("courses").select("*").order("created_at", { ascending: false })).data ?? [],
+    queryFn: async () =>
+      (await supabase.from("courses").select("*").order("created_at", { ascending: false })).data ??
+      [],
   });
 
   const promote = async (userId: string, role: "instructor" | "admin") => {
@@ -66,11 +92,24 @@ function AdminDashboard() {
   // announcement
   const [annTitle, setAnnTitle] = useState("");
   const [annBody, setAnnBody] = useState("");
+
   const postAnn = async () => {
     if (!annTitle.trim()) return;
-    const { error } = await supabase.from("announcements" as never).insert([{ title: annTitle, body: annBody }] as any);
-    if (error) return toast.error(error.message);
-    setAnnTitle(""); setAnnBody("");
+
+    const { error } = await supabase.from("announcements").insert([
+      {
+        title: annTitle,
+        body: annBody,
+      },
+    ]);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    setAnnTitle("");
+    setAnnBody("");
     toast.success("Announcement published");
   };
 
@@ -81,8 +120,12 @@ function AdminDashboard() {
       <div className="glass mx-auto max-w-md rounded-2xl p-8 text-center">
         <Lock className="mx-auto h-8 w-8 text-muted-foreground" />
         <h2 className="font-display mt-4 text-xl font-semibold">Admin only</h2>
-        <p className="mt-2 text-sm text-muted-foreground">This area is restricted to platform administrators.</p>
-        <Button asChild className="mt-6"><Link to="/dashboard">Back to dashboard</Link></Button>
+        <p className="mt-2 text-sm text-muted-foreground">
+          This area is restricted to platform administrators.
+        </p>
+        <Button asChild className="mt-6">
+          <Link to="/dashboard">Back to dashboard</Link>
+        </Button>
       </div>
     );
   }
@@ -128,7 +171,13 @@ function AdminDashboard() {
           <div className="glass overflow-x-auto rounded-2xl">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="p-3 text-left">Name</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Streak</th><th className="p-3 text-left">Roles</th><th className="p-3 text-right">Actions</th></tr>
+                <tr>
+                  <th className="p-3 text-left">Name</th>
+                  <th className="p-3 text-left">XP</th>
+                  <th className="p-3 text-left">Streak</th>
+                  <th className="p-3 text-left">Roles</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
               </thead>
               <tbody>
                 {users?.map((u) => (
@@ -136,10 +185,24 @@ function AdminDashboard() {
                     <td className="p-3">{u.display_name ?? "—"}</td>
                     <td className="p-3">{u.xp}</td>
                     <td className="p-3">{u.streak_days}d</td>
-                    <td className="p-3"><span className="text-xs">{u.roles.join(", ") || "student"}</span></td>
+                    <td className="p-3">
+                      <span className="text-xs">{u.roles.join(", ") || "student"}</span>
+                    </td>
                     <td className="p-3 text-right">
-                      {!u.roles.includes("instructor") && <Button size="sm" variant="ghost" onClick={() => promote(u.id, "instructor")}>+ Instructor</Button>}
-                      {!u.roles.includes("admin") && <Button size="sm" variant="ghost" onClick={() => promote(u.id, "admin")}>+ Admin</Button>}
+                      {!u.roles.includes("instructor") && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => promote(u.id, "instructor")}
+                        >
+                          + Instructor
+                        </Button>
+                      )}
+                      {!u.roles.includes("admin") && (
+                        <Button size="sm" variant="ghost" onClick={() => promote(u.id, "admin")}>
+                          + Admin
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -154,9 +217,15 @@ function AdminDashboard() {
               <div key={c.id} className="glass flex items-center justify-between rounded-xl p-3">
                 <div>
                   <p className="font-medium">{c.title}</p>
-                  <p className="text-xs text-muted-foreground">{c.category} · {c.level}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {c.category} · {c.level}
+                  </p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => togglePublish(c.id, c.is_published)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => togglePublish(c.id, c.is_published)}
+                >
                   {c.is_published ? "Unpublish" : "Publish"}
                 </Button>
               </div>
@@ -166,20 +235,44 @@ function AdminDashboard() {
 
         <TabsContent value="announcements" className="mt-4">
           <div className="glass space-y-3 rounded-2xl p-5">
-            <div className="flex items-center gap-2"><Megaphone className="h-4 w-4 text-primary" /><h3 className="font-semibold">Post announcement</h3></div>
-            <Input placeholder="Title" value={annTitle} onChange={(e) => setAnnTitle(e.target.value)} />
-            <Textarea placeholder="Message" value={annBody} onChange={(e) => setAnnBody(e.target.value)} rows={3} />
-            <Button onClick={postAnn} className="bg-gradient-brand text-primary-foreground border-0"><Plus className="mr-1 h-4 w-4" />Publish</Button>
+            <div className="flex items-center gap-2">
+              <Megaphone className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Post announcement</h3>
+            </div>
+            <Input
+              placeholder="Title"
+              value={annTitle}
+              onChange={(e) => setAnnTitle(e.target.value)}
+            />
+            <Textarea
+              placeholder="Message"
+              value={annBody}
+              onChange={(e) => setAnnBody(e.target.value)}
+              rows={3}
+            />
+            <Button
+              onClick={postAnn}
+              className="bg-gradient-brand text-primary-foreground border-0"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              Publish
+            </Button>
           </div>
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4">
           <div className="glass rounded-2xl p-6">
             <h3 className="font-display text-lg font-semibold">Platform settings</h3>
-            <p className="mt-2 text-sm text-muted-foreground">Branding, billing, integrations, and limits.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Branding, billing, integrations, and limits.
+            </p>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border p-3 text-sm"><strong>Total certificates issued:</strong> {stats?.certs ?? 0}</div>
-              <div className="rounded-xl border p-3 text-sm"><strong>Active platform:</strong> Lovable Cloud</div>
+              <div className="rounded-xl border p-3 text-sm">
+                <strong>Total certificates issued:</strong> {stats?.certs ?? 0}
+              </div>
+              <div className="rounded-xl border p-3 text-sm">
+                <strong>Active platform:</strong> Lovable Cloud
+              </div>
             </div>
           </div>
         </TabsContent>

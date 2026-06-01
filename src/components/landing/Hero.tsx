@@ -20,15 +20,18 @@ export function Hero() {
             AI-powered learning · Live in 2026
           </div>
           <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
-            Learn coding by <span className="text-gradient">building real</span> projects.
+            Learn coding by <span className="text-gradient">building real</span> scalable projects.
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base text-muted-foreground sm:text-lg">
-            From your first line of code to your first paycheck. JewelIQ Academy blends
-            premium courses, an AI tutor, and a hands-on playground to take you from
-            beginner to professional developer.
+            From your first line of code to your first paycheck. JewelIQ Academy blends premium
+            courses, an AI tutor, and a hands-on playground to take you from beginner to
+            professional developer.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Button size="lg" className="bg-gradient-brand text-primary-foreground border-0 shadow-glow group">
+            <Button
+              size="lg"
+              className="bg-gradient-brand text-primary-foreground border-0 shadow-glow group"
+            >
               Start learning free
               <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
             </Button>
