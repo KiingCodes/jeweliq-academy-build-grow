@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Loader2, LayoutDashboard, BookOpen, Code2, Bot, LogOut, Shield, GraduationCap, Award, Users } from "lucide-react";
+import { Loader2, LayoutDashboard, BookOpen, Code2, Bot, LogOut, Shield, GraduationCap, Award, Users, AlertCircle } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 import { useRoles } from "@/hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +21,7 @@ const baseNav = [
 
 function AppLayout() {
   const { user, loading } = useSession();
-  const { isAdmin, isInstructor } = useRoles();
+  const { isAdmin, isInstructor, isLoading: rolesLoading, isError: rolesError, error: rolesErrorDetail } = useRoles();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
@@ -29,10 +29,22 @@ function AppLayout() {
     if (!loading && !user) navigate({ to: "/login" });
   }, [loading, user, navigate]);
 
-  if (loading || !user) {
+  if (loading || !user || rolesLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (rolesError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gradient-subtle p-6">
+        <div className="glass max-w-md rounded-2xl p-6 text-center">
+          <AlertCircle className="mx-auto h-8 w-8 text-destructive" />
+          <h1 className="font-display mt-4 text-xl font-semibold">Couldn’t load your permissions</h1>
+          <p className="mt-2 text-sm text-muted-foreground">{rolesErrorDetail?.message ?? "Refresh the page and try again."}</p>
+        </div>
       </div>
     );
   }
