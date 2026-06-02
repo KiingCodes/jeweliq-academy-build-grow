@@ -178,27 +178,25 @@ function CourseDetail() {
               <h1 className="font-display mt-3 text-3xl font-semibold tracking-tight">{active.title}</h1>
 
               <Tabs value={tab} onValueChange={setTab} className="mt-5">
-                <TabsList className="grid w-full grid-cols-4 sm:w-auto sm:inline-flex">
-                  <TabsTrigger value="read"><BookOpen className="mr-1 h-3.5 w-3.5" />Read</TabsTrigger>
-                  <TabsTrigger value="code"><Code2 className="mr-1 h-3.5 w-3.5" />Code</TabsTrigger>
+                <TabsList className={`grid w-full ${active.lesson_type === "code" ? "grid-cols-4" : "grid-cols-3"} sm:w-auto sm:inline-flex`}>
+                  <TabsTrigger value="read"><BookOpen className="mr-1 h-3.5 w-3.5" />Lesson</TabsTrigger>
+                  {active.lesson_type === "code" && (
+                    <TabsTrigger value="code"><Code2 className="mr-1 h-3.5 w-3.5" />Practice</TabsTrigger>
+                  )}
                   <TabsTrigger value="quiz"><HelpCircle className="mr-1 h-3.5 w-3.5" />Quiz</TabsTrigger>
                   <TabsTrigger value="notes">Notes</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="read" className="mt-5 space-y-5">
-                  {active.video_url && (
-                    <div className="aspect-video overflow-hidden rounded-xl border bg-black">
-                      <iframe className="h-full w-full" src={active.video_url} title={active.title} allowFullScreen />
+                  <LessonMedia lesson={active} />
+                  {active.content && (
+                    <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+                      {active.content}
                     </div>
                   )}
-                  {!active.video_url && (
-                    <div className="bg-gradient-hero flex aspect-video items-center justify-center rounded-xl text-white/80">
-                      <PlayCircle className="h-12 w-12" />
-                    </div>
+                  {!active.content && !active.video_url && (
+                    <p className="text-sm text-muted-foreground">Lesson content coming soon.</p>
                   )}
-                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
-                    {active.content ?? "Lesson content coming soon."}
-                  </p>
                   {enrollment && (
                     <Button onClick={toggleComplete} variant={completedIds.has(active.id) ? "outline" : "default"} className={completedIds.has(active.id) ? "" : "bg-gradient-brand text-primary-foreground border-0"}>
                       {completedIds.has(active.id) ? "Completed ✓" : "Mark as complete  +25 XP"}
@@ -206,9 +204,11 @@ function CourseDetail() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="code" className="mt-5">
-                  <CodePlayground lesson={active} />
-                </TabsContent>
+                {active.lesson_type === "code" && (
+                  <TabsContent value="code" className="mt-5">
+                    <CodePlayground lesson={active} />
+                  </TabsContent>
+                )}
 
                 <TabsContent value="quiz" className="mt-5">
                   <QuizSection lessonId={active.id} onPass={toggleComplete} />
