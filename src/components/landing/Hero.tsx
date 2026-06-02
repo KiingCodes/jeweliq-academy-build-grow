@@ -1,61 +1,62 @@
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import heroImg from "@/assets/hero.jpg";
 
 export function Hero() {
   return (
     <section className="relative overflow-hidden pt-16 pb-24 sm:pt-24 sm:pb-32">
       <div
         aria-hidden
-        className="absolute inset-0 -z-10 opacity-60"
+        className="absolute inset-0 -z-10 opacity-70"
         style={{
           background:
-            "radial-gradient(60% 50% at 50% 0%, oklch(0.85 0.12 285 / 0.35), transparent 70%), radial-gradient(40% 40% at 80% 20%, oklch(0.85 0.12 230 / 0.3), transparent 70%)",
+            "radial-gradient(60% 50% at 50% 0%, oklch(0.78 0.16 260 / 0.35), transparent 70%), radial-gradient(40% 40% at 80% 20%, oklch(0.82 0.18 50 / 0.35), transparent 70%)",
         }}
       />
-      <div className="mx-auto max-w-6xl px-4 sm:px-6">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="glass mx-auto mb-6 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium text-muted-foreground">
-            <span className="bg-gradient-brand h-1.5 w-1.5 rounded-full" />
-            AI-powered learning · Live in 2026
+          <div className="glass mx-auto mb-7 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium text-muted-foreground">
+            <Sparkles className="h-3.5 w-3.5 text-[color:var(--accent-orange)]" />
+            The premium academy for modern founders
           </div>
-          <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-6xl lg:text-7xl">
-            Learn coding by <span className="text-gradient">building real</span> projects.
+          <h1
+            style={{ fontFamily: "var(--font-hero)" }}
+            className="text-5xl font-light leading-[1.05] tracking-tight sm:text-7xl lg:text-[5.5rem]"
+          >
+            Build your <em className="not-italic text-gradient" style={{ fontStyle: "italic", fontWeight: 500 }}>online empire</em><br className="hidden sm:block" /> from anywhere.
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-base text-muted-foreground sm:text-lg">
-            From your first line of code to your first paycheck. JewelIQ Academy blends
-            premium courses, an AI tutor, and a hands-on playground to take you from
-            beginner to professional developer.
+          <p className="mx-auto mt-7 max-w-xl text-base text-muted-foreground sm:text-lg">
+            JewelIQ Academy is the premium platform for digital entrepreneurs. Master the
+            mindset, marketing, and money systems behind every successful online business —
+            with expert lessons, an AI coach, and a community of doers.
           </p>
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Button size="lg" className="bg-gradient-brand text-primary-foreground border-0 shadow-glow group">
-              Start learning free
-              <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+            <Button asChild size="lg" className="bg-gradient-brand group rounded-xl border-0 text-primary-foreground shadow-glow">
+              <Link to="/signup">
+                Start free today
+                <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Link>
             </Button>
-            <Button size="lg" variant="outline" className="rounded-xl">
-              <Play className="mr-1 h-4 w-4" /> Watch demo
+            <Button asChild size="lg" variant="outline" className="rounded-xl">
+              <Link to="/courses">Browse courses</Link>
             </Button>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            Free forever plan · No credit card required
+            No credit card · Cancel anytime · Lifetime updates
           </p>
         </div>
 
-        <div className="relative mx-auto mt-16 max-w-5xl">
-          <div
-            aria-hidden
-            className="absolute -inset-x-10 -inset-y-6 -z-10 rounded-[3rem] blur-3xl opacity-50"
-            style={{ background: "var(--gradient-hero)" }}
-          />
-          <div className="glass overflow-hidden rounded-3xl shadow-glow">
-            <img
-              src={heroImg}
-              alt="Floating code editors and crystalline shapes"
-              width={1600}
-              height={1200}
-              className="h-auto w-full"
-            />
-          </div>
+        <div className="relative mx-auto mt-20 grid max-w-4xl grid-cols-3 gap-4 text-center">
+          {[
+            { k: "10k+", v: "Founders learning" },
+            { k: "8", v: "Premium courses" },
+            { k: "24/7", v: "AI coaching" },
+          ].map((s) => (
+            <div key={s.v} className="glass rounded-2xl p-5">
+              <div style={{ fontFamily: "var(--font-hero)" }} className="text-3xl font-medium text-gradient sm:text-4xl">{s.k}</div>
+              <div className="mt-1 text-xs text-muted-foreground sm:text-sm">{s.v}</div>
+            </div>
+          ))}
         </div>
       </div>
     </section>

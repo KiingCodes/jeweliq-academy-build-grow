@@ -1,11 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { GraduationCap, Users, BookOpen, DollarSign, Plus, Loader2, Lock, FileText } from "lucide-react";
+import { GraduationCap, Users, BookOpen, DollarSign, Plus, Loader2, Lock, FileText, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoles } from "@/hooks/use-roles";
-import { useSession } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +19,6 @@ function slugify(s: string) { return s.toLowerCase().trim().replace(/[^a-z0-9]+/
 
 function InstructorDashboard() {
   const { isInstructor, isAdmin, isLoading } = useRoles();
-  const { user } = useSession();
   const qc = useQueryClient();
 
   const { data: stats } = useQuery({
@@ -44,10 +42,10 @@ function InstructorDashboard() {
 
   // Create course form
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState("Web Development");
+  const [category, setCategory] = useState("Foundations");
   const [level, setLevel] = useState("beginner");
   const [description, setDescription] = useState("");
-  const [hue, setHue] = useState("280");
+  const [hue, setHue] = useState("255");
 
   const createCourse = async () => {
     if (!title.trim()) return;
@@ -65,7 +63,29 @@ function InstructorDashboard() {
   const [lessonTitle, setLessonTitle] = useState("");
   const [lessonContent, setLessonContent] = useState("");
   const [lessonVideo, setLessonVideo] = useState("");
-  const [lessonType, setLessonType] = useState("reading");
+  const [lessonType, setLessonType] = useState<"reading" | "video" | "audio" | "image">("reading");
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const path = `lessons/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from("lesson-media").upload(path, file, { upsert: false, contentType: file.type });
+      if (upErr) throw upErr;
+      // create a long-lived signed URL (10 years)
+      const { data: signed, error: signErr } = await supabase.storage.from("lesson-media").createSignedUrl(path, 60 * 60 * 24 * 365 * 10);
+      if (signErr) throw signErr;
+      setLessonVideo(signed.signedUrl);
+      const kind = file.type.startsWith("audio/") ? "audio" : file.type.startsWith("image/") ? "image" : "video";
+      setLessonType(kind);
+      toast.success(`${kind} uploaded — URL attached`);
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const addLesson = async () => {
     if (!lessonCourse || !lessonTitle.trim()) return;
@@ -77,6 +97,7 @@ function InstructorDashboard() {
     if (error) return toast.error(error.message);
     toast.success("Lesson added!");
     setLessonTitle(""); setLessonContent(""); setLessonVideo("");
+    qc.invalidateQueries({ queryKey: ["course"] });
   };
 
   if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />;
@@ -94,7 +115,7 @@ function InstructorDashboard() {
 
   const tiles = [
     { label: "Courses", value: stats?.courses ?? 0, icon: BookOpen },
-    { label: "Students", value: stats?.students ?? 0, icon: Users },
+    { label: "Enrollments", value: stats?.students ?? 0, icon: Users },
     { label: "Lessons", value: stats?.lessons ?? 0, icon: GraduationCap },
     { label: "Earnings (mo)", value: "$0", icon: DollarSign },
   ];
@@ -103,7 +124,7 @@ function InstructorDashboard() {
     <div className="space-y-6">
       <div>
         <p className="text-xs uppercase tracking-wide text-muted-foreground">Instructor</p>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Teach what you love</h1>
+        <h1 style={{ fontFamily: "var(--font-hero)" }} className="text-3xl font-medium tracking-tight">Teach what you&rsquo;ve built</h1>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -113,18 +134,72 @@ function InstructorDashboard() {
               <p className="text-xs text-muted-foreground">{t.label}</p>
               <t.icon className="h-4 w-4 text-muted-foreground" />
             </div>
-            <p className="font-display mt-2 text-3xl font-semibold">{t.value}</p>
+            <p style={{ fontFamily: "var(--font-hero)" }} className="mt-2 text-3xl font-medium">{t.value}</p>
           </div>
         ))}
       </div>
 
-      <Tabs defaultValue="create-course">
+      <Tabs defaultValue="add-lesson">
         <TabsList>
-          <TabsTrigger value="create-course"><Plus className="mr-1 h-3.5 w-3.5" />New course</TabsTrigger>
           <TabsTrigger value="add-lesson"><FileText className="mr-1 h-3.5 w-3.5" />Add lesson</TabsTrigger>
+          <TabsTrigger value="create-course"><Plus className="mr-1 h-3.5 w-3.5" />New course</TabsTrigger>
           <TabsTrigger value="manage">Manage</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="add-lesson" className="mt-4">
+          <div className="glass space-y-3 rounded-2xl p-5">
+            <label className="text-xs font-medium text-muted-foreground">Course</label>
+            <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={lessonCourse} onChange={(e) => setLessonCourse(e.target.value)}>
+              <option value="">Select a course…</option>
+              {myCourses?.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+            </select>
+
+            <label className="text-xs font-medium text-muted-foreground">Lesson title</label>
+            <Input placeholder="e.g. Crafting Your Irresistible Offer" value={lessonTitle} onChange={(e) => setLessonTitle(e.target.value)} />
+
+            <label className="text-xs font-medium text-muted-foreground">Lesson text (supports line breaks & bullet points)</label>
+            <Textarea
+              placeholder={"Write the full lesson here…\n\nUse bullet points:\n• Point one\n• Point two\n\nLearners will see this beautifully rendered."}
+              value={lessonContent}
+              onChange={(e) => setLessonContent(e.target.value)}
+              rows={10}
+            />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Lesson type</label>
+                <select className="mt-1 w-full rounded-md border bg-background px-3 py-2 text-sm" value={lessonType} onChange={(e) => setLessonType(e.target.value as typeof lessonType)}>
+                  <option value="reading">📖 Reading (text only)</option>
+                  <option value="video">🎥 Video</option>
+                  <option value="audio">🎧 Audio / Podcast</option>
+                  <option value="image">🖼️ Image / Infographic</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Media URL (optional)</label>
+                <Input placeholder="https://…  (YouTube embed, mp3, image, etc.)" value={lessonVideo} onChange={(e) => setLessonVideo(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-dashed bg-background/40 p-4">
+              <label className="flex cursor-pointer items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+                <Upload className="h-4 w-4" />
+                {uploading ? "Uploading…" : "Or upload media (video, audio, image)"}
+                <input
+                  type="file"
+                  accept="video/*,audio/*,image/*"
+                  className="hidden"
+                  disabled={uploading}
+                  onChange={(e) => e.target.files?.[0] && handleUpload(e.target.files[0])}
+                />
+              </label>
+              {lessonVideo && <p className="mt-2 truncate text-[11px] text-muted-foreground">Attached: {lessonVideo}</p>}
+            </div>
+
+            <Button onClick={addLesson} disabled={!lessonCourse || !lessonTitle.trim()} className="bg-gradient-brand text-primary-foreground border-0">Add lesson</Button>
+          </div>
+        </TabsContent>
 
         <TabsContent value="create-course" className="mt-4">
           <div className="glass space-y-3 rounded-2xl p-5">
@@ -138,24 +213,6 @@ function InstructorDashboard() {
               <Input placeholder="Hue (0-360)" value={hue} onChange={(e) => setHue(e.target.value)} />
             </div>
             <Button onClick={createCourse} className="bg-gradient-brand text-primary-foreground border-0">Create course</Button>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="add-lesson" className="mt-4">
-          <div className="glass space-y-3 rounded-2xl p-5">
-            <select className="w-full rounded-md border bg-background px-3 py-2 text-sm" value={lessonCourse} onChange={(e) => setLessonCourse(e.target.value)}>
-              <option value="">Select a course…</option>
-              {myCourses?.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
-            </select>
-            <Input placeholder="Lesson title" value={lessonTitle} onChange={(e) => setLessonTitle(e.target.value)} />
-            <Textarea placeholder="Lesson content (markdown-friendly text)" value={lessonContent} onChange={(e) => setLessonContent(e.target.value)} rows={5} />
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Input placeholder="Video URL (optional)" value={lessonVideo} onChange={(e) => setLessonVideo(e.target.value)} />
-              <select className="rounded-md border bg-background px-3 py-2 text-sm" value={lessonType} onChange={(e) => setLessonType(e.target.value)}>
-                <option value="reading">Reading</option><option value="video">Video</option><option value="code">Code challenge</option>
-              </select>
-            </div>
-            <Button onClick={addLesson} className="bg-gradient-brand text-primary-foreground border-0">Add lesson</Button>
           </div>
         </TabsContent>
 
@@ -177,7 +234,6 @@ function InstructorDashboard() {
           <div className="glass rounded-2xl p-6">
             <h3 className="font-display text-lg font-semibold">Analytics</h3>
             <p className="mt-2 text-sm text-muted-foreground">Total enrollments: <strong>{stats?.students ?? 0}</strong> · Lessons published: <strong>{stats?.lessons ?? 0}</strong></p>
-            <p className="mt-1 text-xs text-muted-foreground">Detailed cohort & funnel analytics rolling out next.</p>
           </div>
         </TabsContent>
       </Tabs>
