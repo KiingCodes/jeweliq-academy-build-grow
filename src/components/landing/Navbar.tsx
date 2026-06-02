@@ -27,10 +27,13 @@ export function Navbar() {
         <Link to="/" className="flex items-center gap-2">
           <Logo className="h-8 w-auto" />
         </Link>
+        <Link to="/" className="flex items-center gap-2">
+          <Logo className="h-10 w-auto" />
+        </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
           <Link to="/courses" className="hover:text-foreground transition-colors">Courses</Link>
-          <Link to="/playground" className="hover:text-foreground transition-colors">Playground</Link>
-          <Link to="/tutor" className="hover:text-foreground transition-colors">AI Tutor</Link>
+          <Link to="/community" className="hover:text-foreground transition-colors">Community</Link>
+          <Link to="/tutor" className="hover:text-foreground transition-colors">AI Coach</Link>
         </nav>
         <div className="flex items-center gap-2">
           {user ? (
