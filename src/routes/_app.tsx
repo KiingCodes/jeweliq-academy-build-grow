@@ -13,8 +13,7 @@ export const Route = createFileRoute("/_app")({
 const baseNav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/courses", label: "Courses", icon: BookOpen },
-  { to: "/playground", label: "Playground", icon: Code2 },
-  { to: "/tutor", label: "AI Tutor", icon: Bot },
+  { to: "/tutor", label: "AI Coach", icon: Bot },
   { to: "/community", label: "Community", icon: Users },
   { to: "/certificates", label: "Certificates", icon: Award },
 ] as const;
