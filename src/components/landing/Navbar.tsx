@@ -25,9 +25,6 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full px-3">
       <div className="glass mx-auto mt-3 flex h-14 max-w-6xl items-center justify-between rounded-full px-4 sm:px-6">
         <Link to="/" className="flex items-center gap-2">
-          <Logo className="h-8 w-auto" />
-        </Link>
-        <Link to="/" className="flex items-center gap-2">
           <Logo className="h-10 w-auto" />
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
