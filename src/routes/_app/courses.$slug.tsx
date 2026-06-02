@@ -231,7 +231,44 @@ function CourseDetail() {
   );
 }
 
-/* ---------- Code playground ---------- */
+/* ---------- Lesson media (image / audio / video) ---------- */
+function LessonMedia({ lesson }: { lesson: Lesson }) {
+  const url = lesson.video_url;
+  const type = lesson.lesson_type ?? "reading";
+  if (!url) {
+    if (type === "reading") return null;
+    return (
+      <div className="bg-gradient-hero flex aspect-video items-center justify-center rounded-xl text-white/80">
+        <PlayCircle className="h-12 w-12" />
+      </div>
+    );
+  }
+  if (type === "image") {
+    return <img src={url} alt={lesson.title} className="w-full rounded-xl border" loading="lazy" />;
+  }
+  if (type === "audio") {
+    return (
+      <div className="glass rounded-xl p-4">
+        <audio controls src={url} className="w-full" />
+      </div>
+    );
+  }
+  // video — embed iframe for youtube/vimeo style, native video for direct files
+  const isEmbed = /youtube|youtu\.be|vimeo|loom/.test(url);
+  if (isEmbed) {
+    const src = url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
+    return (
+      <div className="aspect-video overflow-hidden rounded-xl border bg-black">
+        <iframe className="h-full w-full" src={src} title={lesson.title} allowFullScreen />
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-xl border bg-black">
+      <video controls src={url} className="aspect-video w-full" />
+    </div>
+  );
+}
 function CodePlayground({ lesson }: { lesson: Lesson }) {
   const lang = lesson.code_language ?? "javascript";
   const initial = lesson.starter_code ?? `// Try writing some ${lang} code\nconsole.log("Hello from JewelIQ");`;
