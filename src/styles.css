@@ -34,10 +34,10 @@
   --color-brand-foreground: var(--brand-foreground);
   --color-accent-orange: var(--accent-orange);
   --color-accent-sky: var(--accent-sky);
-  --font-display: "Fraunces", "Instrument Serif", Georgia, serif;
+  --font-display: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --font-hero: "Fraunces", "Instrument Serif", Georgia, serif;
+  --font-hero: "Bricolage Grotesque", "Inter", system-ui, sans-serif;
   --shadow-soft: 0 1px 2px 0 oklch(0.4 0.15 260 / 0.06), 0 8px 24px -8px oklch(0.4 0.15 260 / 0.15);
   --shadow-glow: 0 0 0 1px oklch(0.55 0.2 260 / 0.1), 0 20px 60px -20px oklch(0.72 0.2 50 / 0.35);
 }
