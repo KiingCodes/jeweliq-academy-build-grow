@@ -1,21 +1,17 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
-import Editor from "@monaco-editor/react";
+import { useEffect, useState } from "react";
 import {
-  Check, Circle, Loader2, ArrowLeft, PlayCircle, Search, Bookmark, BookmarkCheck,
-  BookOpen, Code2, HelpCircle, Bot, Sparkles, Send, Play, RotateCcw, Trash2, Trophy,
+  Check, Circle, Loader2, ArrowLeft, PlayCircle, Bookmark, BookmarkCheck,
+  BookOpen, HelpCircle, Sparkles, Trophy, Lock, ChevronDown, ChevronRight, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
+import { useRoles } from "@/hooks/use-roles";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { askTutor } from "@/lib/tutor.functions";
 
 export const Route = createFileRoute("/_app/courses/$slug")({
   component: CourseDetail,
@@ -24,31 +20,43 @@ export const Route = createFileRoute("/_app/courses/$slug")({
 type Lesson = {
   id: string; title: string; content: string | null; order_index: number;
   duration_minutes: number | null; lesson_type: string | null;
-  code_language: string | null; starter_code: string | null;
-  difficulty: string | null; video_url: string | null;
+  video_url: string | null; difficulty: string | null;
+  module_id: string | null;
 };
+type Module = { id: string; title: string; description: string | null; order_index: number };
 type Quiz = { id: string; question: string; options: string[]; correct_index: number; explanation: string | null; order_index: number };
 
 function CourseDetail() {
   const { slug } = Route.useParams();
   const { user } = useSession();
+  const { isAdmin, isInstructor } = useRoles();
   const qc = useQueryClient();
-  const navigate = useNavigate();
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
   const [tab, setTab] = useState("read");
+  const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
 
   const { data: course, isLoading } = useQuery({
     queryKey: ["course", slug],
     queryFn: async () => {
-      const { data } = await supabase.from("courses").select("*, lessons(*)").eq("slug", slug).maybeSingle();
+      const { data } = await supabase.from("courses").select("*, lessons(*), modules(*)").eq("slug", slug).maybeSingle();
       if (data?.lessons) (data.lessons as Lesson[]).sort((a, b) => a.order_index - b.order_index);
+      if (data?.modules) (data.modules as Module[]).sort((a, b) => a.order_index - b.order_index);
       return data;
     },
   });
 
   const lessons: Lesson[] = course?.lessons ?? [];
+  const modules: Module[] = course?.modules ?? [];
   const active = lessons.find((l) => l.id === selectedLesson) ?? lessons[0];
+
+  const { data: enrollment } = useQuery({
+    queryKey: ["enrollment", user?.id, course?.id],
+    enabled: !!user && !!course,
+    queryFn: async () => {
+      const { data } = await supabase.from("enrollments").select("*").eq("course_id", course!.id).maybeSingle();
+      return data;
+    },
+  });
 
   const { data: progress } = useQuery({
     queryKey: ["lesson-progress", user?.id, course?.id],
@@ -61,15 +69,6 @@ function CourseDetail() {
     },
   });
 
-  const { data: enrollment } = useQuery({
-    queryKey: ["enrollment", user?.id, course?.id],
-    enabled: !!user && !!course,
-    queryFn: async () => {
-      const { data } = await supabase.from("enrollments").select("*").eq("course_id", course!.id).maybeSingle();
-      return data;
-    },
-  });
-
   const { data: bookmarks } = useQuery({
     queryKey: ["bookmarks", user?.id],
     enabled: !!user,
@@ -79,21 +78,42 @@ function CourseDetail() {
     },
   });
 
+  useEffect(() => {
+    if (modules.length && Object.keys(openModules).length === 0) {
+      setOpenModules(Object.fromEntries(modules.map((m) => [m.id, true])));
+    }
+  }, [modules, openModules]);
+
   if (isLoading) return <div className="flex h-96 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!course) return <div className="text-center text-muted-foreground">Course not found.</div>;
 
+  const isStaff = isAdmin || isInstructor;
+  const hasAccess = isStaff || !!enrollment;
+
+  if (!hasAccess) {
+    return (
+      <div className="mx-auto max-w-lg">
+        <Link to="/courses" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Link>
+        <div className="glass rounded-2xl p-10 text-center">
+          <Lock className="mx-auto h-10 w-10 text-muted-foreground" />
+          <h1 className="font-display mt-4 text-2xl font-semibold">{course.title}</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This course is for enrolled students only. Reach out to be added to the program.
+          </p>
+          <a href={`mailto:hello@jeweliq.academy?subject=Access to ${course.title}`} className="bg-gradient-brand mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-soft">
+            <Mail className="h-4 w-4" /> Request enrollment
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   const completedIds = new Set((progress ?? []).filter((p) => p.completed).map((p) => p.lesson_id));
   const percent = lessons.length ? Math.round((completedIds.size / lessons.length) * 100) : 0;
-  const filtered = lessons.filter((l) => l.title.toLowerCase().includes(search.toLowerCase()));
   const isBookmarked = active && bookmarks?.includes(active.id);
-
-  const enroll = async () => {
-    if (!user) { navigate({ to: "/login" }); return; }
-    const { error } = await supabase.from("enrollments").insert({ user_id: user.id, course_id: course.id });
-    if (error) return toast.error(error.message);
-    toast.success("Enrolled! Let's go 🚀");
-    qc.invalidateQueries({ queryKey: ["enrollment"] });
-  };
+  const unassigned = lessons.filter((l) => !l.module_id);
 
   const toggleComplete = async () => {
     if (!user || !active) return;
@@ -117,6 +137,23 @@ function CourseDetail() {
     qc.invalidateQueries({ queryKey: ["bookmarks"] });
   };
 
+  const lessonItem = (l: Lesson) => {
+    const done = completedIds.has(l.id);
+    const isActive = active?.id === l.id;
+    return (
+      <li key={l.id}>
+        <button onClick={() => { setSelectedLesson(l.id); setTab("read"); }}
+          className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${isActive ? "bg-accent" : "hover:bg-accent/60"}`}>
+          {done ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /> : <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium">{l.title}</span>
+            <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{l.lesson_type ?? "reading"} · {l.duration_minutes ?? 5}m</span>
+          </span>
+        </button>
+      </li>
+    );
+  };
+
   return (
     <div>
       <Link to="/courses" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
@@ -132,40 +169,43 @@ function CourseDetail() {
           </div>
         </div>
         <span className="text-xs font-semibold text-muted-foreground">{percent}%</span>
-        {!enrollment && <Button onClick={enroll} size="sm" className="bg-gradient-brand text-primary-foreground border-0">Enroll</Button>}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr_320px]">
-        {/* Left sidebar */}
+      <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
+        {/* Sidebar with modules */}
         <aside className="rounded-2xl border bg-card p-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
-          <div className="relative mb-2">
-            <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search lessons" className="h-8 pl-7 text-xs" />
-          </div>
-          <ul className="space-y-1">
-            {filtered.map((l) => {
-              const done = completedIds.has(l.id);
-              const isActive = active?.id === l.id;
-              return (
-                <li key={l.id}>
-                  <button onClick={() => { setSelectedLesson(l.id); setTab("read"); }}
-                    className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${isActive ? "bg-accent" : "hover:bg-accent/60"}`}>
-                    {done ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" /> : <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate font-medium">{l.title}</span>
-                      <span className="block text-[10px] uppercase tracking-wide text-muted-foreground">{l.lesson_type ?? "reading"} · {l.duration_minutes ?? 5}m</span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Curriculum</p>
+          {modules.map((m) => {
+            const moduleLessons = lessons.filter((l) => l.module_id === m.id);
+            const open = openModules[m.id];
+            const done = moduleLessons.filter((l) => completedIds.has(l.id)).length;
+            return (
+              <div key={m.id} className="mb-2">
+                <button onClick={() => setOpenModules({ ...openModules, [m.id]: !open })}
+                  className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left hover:bg-accent/60">
+                  {open ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold">{m.title}</span>
+                    <span className="block text-[10px] text-muted-foreground">{done}/{moduleLessons.length} complete</span>
+                  </span>
+                </button>
+                {open && <ul className="ml-3 mt-1 space-y-0.5 border-l pl-2">{moduleLessons.map(lessonItem)}</ul>}
+              </div>
+            );
+          })}
+          {unassigned.length > 0 && (
+            <div className="mt-3">
+              {modules.length > 0 && <p className="px-2 pb-1 text-[10px] uppercase tracking-wide text-muted-foreground">Other lessons</p>}
+              <ul className="space-y-0.5">{unassigned.map(lessonItem)}</ul>
+            </div>
+          )}
+          {lessons.length === 0 && <p className="px-2 py-6 text-center text-xs text-muted-foreground">No lessons yet.</p>}
         </aside>
 
-        {/* Main lesson content */}
+        {/* Main content — full width now */}
         <div className="min-w-0">
           {active ? (
-            <article className="rounded-2xl border bg-card p-5 shadow-soft sm:p-7">
+            <article className="rounded-2xl border bg-card p-6 shadow-soft sm:p-10">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" className="capitalize">{active.lesson_type ?? "reading"}</Badge>
                 <Badge variant="outline" className="capitalize">{active.difficulty ?? "beginner"}</Badge>
@@ -175,63 +215,52 @@ function CourseDetail() {
                   {isBookmarked ? "Saved" : "Bookmark"}
                 </button>
               </div>
-              <h1 className="font-display mt-3 text-3xl font-semibold tracking-tight">{active.title}</h1>
+              <h1 className="font-display mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">{active.title}</h1>
 
-              <Tabs value={tab} onValueChange={setTab} className="mt-5">
-                <TabsList className={`grid w-full ${active.lesson_type === "code" ? "grid-cols-4" : "grid-cols-3"} sm:w-auto sm:inline-flex`}>
+              <Tabs value={tab} onValueChange={setTab} className="mt-6">
+                <TabsList>
                   <TabsTrigger value="read"><BookOpen className="mr-1 h-3.5 w-3.5" />Lesson</TabsTrigger>
-                  {active.lesson_type === "code" && (
-                    <TabsTrigger value="code"><Code2 className="mr-1 h-3.5 w-3.5" />Practice</TabsTrigger>
-                  )}
                   <TabsTrigger value="quiz"><HelpCircle className="mr-1 h-3.5 w-3.5" />Quiz</TabsTrigger>
-                  <TabsTrigger value="notes">Notes</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="read" className="mt-5 space-y-5">
-                  <LessonMedia lesson={active} />
-                  {active.content && (
-                    <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
-                      {active.content}
-                    </div>
-                  )}
-                  {!active.content && !active.video_url && (
-                    <p className="text-sm text-muted-foreground">Lesson content coming soon.</p>
-                  )}
-                  {enrollment && (
+                <TabsContent value="read" className="mt-6">
+                  <ReadingView lesson={active} />
+                  <div className="mt-10 flex items-center justify-between gap-3 border-t pt-6">
+                    <p className="text-xs text-muted-foreground">When you're done reading, mark this lesson complete.</p>
                     <Button onClick={toggleComplete} variant={completedIds.has(active.id) ? "outline" : "default"} className={completedIds.has(active.id) ? "" : "bg-gradient-brand text-primary-foreground border-0"}>
-                      {completedIds.has(active.id) ? "Completed ✓" : "Mark as complete  +25 XP"}
+                      {completedIds.has(active.id) ? "Completed ✓" : "Mark complete +25 XP"}
                     </Button>
-                  )}
+                  </div>
                 </TabsContent>
 
-                {active.lesson_type === "code" && (
-                  <TabsContent value="code" className="mt-5">
-                    <CodePlayground lesson={active} />
-                  </TabsContent>
-                )}
-
-                <TabsContent value="quiz" className="mt-5">
+                <TabsContent value="quiz" className="mt-6">
                   <QuizSection lessonId={active.id} onPass={toggleComplete} />
-                </TabsContent>
-
-                <TabsContent value="notes" className="mt-5">
-                  <NotesSection lessonId={active.id} />
                 </TabsContent>
               </Tabs>
             </article>
           ) : <p className="text-sm text-muted-foreground">No lessons yet.</p>}
         </div>
-
-        {/* AI Tutor right sidebar */}
-        <aside className="rounded-2xl border bg-card p-4 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-hidden lg:flex lg:flex-col">
-          <TutorPanel lessonTitle={active?.title} />
-        </aside>
       </div>
     </div>
   );
 }
 
-/* ---------- Lesson media (image / audio / video) ---------- */
+/* ---------- Reading view ---------- */
+function ReadingView({ lesson }: { lesson: Lesson }) {
+  return (
+    <div className="space-y-6">
+      <LessonMedia lesson={lesson} />
+      {lesson.content ? (
+        <div className="prose-content whitespace-pre-wrap text-[17px] leading-[1.75] text-foreground/90">
+          {lesson.content}
+        </div>
+      ) : (
+        !lesson.video_url && <p className="text-sm text-muted-foreground">Lesson content coming soon.</p>
+      )}
+    </div>
+  );
+}
+
 function LessonMedia({ lesson }: { lesson: Lesson }) {
   const url = lesson.video_url;
   const type = lesson.lesson_type ?? "reading";
@@ -253,7 +282,6 @@ function LessonMedia({ lesson }: { lesson: Lesson }) {
       </div>
     );
   }
-  // video — embed iframe for youtube/vimeo style, native video for direct files
   const isEmbed = /youtube|youtu\.be|vimeo|loom/.test(url);
   if (isEmbed) {
     const src = url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
@@ -266,51 +294,6 @@ function LessonMedia({ lesson }: { lesson: Lesson }) {
   return (
     <div className="overflow-hidden rounded-xl border bg-black">
       <video controls src={url} className="aspect-video w-full" />
-    </div>
-  );
-}
-function CodePlayground({ lesson }: { lesson: Lesson }) {
-  const lang = lesson.code_language ?? "javascript";
-  const initial = lesson.starter_code ?? `// Try writing some ${lang} code\nconsole.log("Hello from JewelIQ");`;
-  const [code, setCode] = useState(initial);
-  const [out, setOut] = useState<string[]>([]);
-  const [preview, setPreview] = useState<string | null>(null);
-
-  useEffect(() => { setCode(initial); setOut([]); setPreview(null); }, [lesson.id]); // eslint-disable-line
-
-  const run = () => {
-    setOut([]); setPreview(null);
-    try {
-      if (lang === "html") return setPreview(code);
-      const logs: string[] = [];
-      const c = { log: (...a: unknown[]) => logs.push(a.map(fmt).join(" ")), error: (...a: unknown[]) => logs.push("⚠ " + a.map(fmt).join(" ")), warn: (...a: unknown[]) => logs.push("⚠ " + a.map(fmt).join(" ")) };
-      const stripped = lang === "typescript" ? code.replace(/:\s*[A-Za-z<>[\]|&,\s]+(?=[=,)])/g, "") : code;
-      const r = new Function("console", stripped)(c);
-      if (r !== undefined) logs.push("→ " + fmt(r));
-      setOut(logs);
-    } catch (e) { setOut([`❌ ${(e as Error).message}`]); }
-  };
-
-  return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      <div className="overflow-hidden rounded-xl border">
-        <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2 text-xs">
-          <span className="font-medium uppercase tracking-wide text-muted-foreground">{lang}</span>
-          <div className="flex gap-1">
-            <Button onClick={() => setCode(initial)} variant="ghost" size="sm" className="h-7"><RotateCcw className="h-3.5 w-3.5" /></Button>
-            <Button onClick={run} size="sm" className="bg-gradient-brand text-primary-foreground border-0 h-7"><Play className="mr-1 h-3.5 w-3.5" />Run</Button>
-          </div>
-        </div>
-        <Editor height="340px" language={lang === "html" ? "html" : lang} value={code} theme="vs-dark" onChange={(v) => setCode(v ?? "")} options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false }} />
-      </div>
-      <div className="flex flex-col overflow-hidden rounded-xl border">
-        <div className="flex items-center justify-between border-b bg-muted/30 px-3 py-2 text-xs">
-          <span className="font-medium uppercase tracking-wide text-muted-foreground">{preview ? "Preview" : "Console"}</span>
-          <button onClick={() => { setOut([]); setPreview(null); }} className="text-muted-foreground hover:text-foreground"><Trash2 className="h-3.5 w-3.5" /></button>
-        </div>
-        {preview ? <iframe title="preview" srcDoc={preview} className="flex-1 bg-white" sandbox="" />
-          : <pre className="min-h-[340px] flex-1 overflow-auto bg-[oklch(0.18_0.03_270)] p-4 font-mono text-xs text-[oklch(0.95_0.02_280)]">{out.length === 0 ? <span className="text-muted-foreground">Click Run to see output.</span> : out.join("\n")}</pre>}
-      </div>
     </div>
   );
 }
@@ -330,44 +313,44 @@ function QuizSection({ lessonId, onPass }: { lessonId: string; onPass: () => voi
   useEffect(() => { setAnswers({}); setSubmitted(false); }, [lessonId]);
 
   if (isLoading) return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
-  if (!quizzes?.length) return <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No quiz for this lesson yet.</div>;
+  if (!quizzes?.length) return <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">No quiz for this lesson yet.</div>;
 
   const score = quizzes.filter((q) => answers[q.id] === q.correct_index).length;
   const passed = submitted && score === quizzes.length;
 
   return (
-    <div className="space-y-5">
+    <div className="mx-auto max-w-3xl space-y-6">
       {quizzes.map((q, i) => (
-        <div key={q.id} className="rounded-xl border bg-background/50 p-4">
-          <p className="text-sm font-medium">{i + 1}. {q.question}</p>
-          <div className="mt-3 space-y-2">
+        <div key={q.id} className="rounded-xl border bg-background/50 p-5">
+          <p className="text-base font-medium leading-snug">{i + 1}. {q.question}</p>
+          <div className="mt-4 space-y-2">
             {q.options.map((opt, idx) => {
               const picked = answers[q.id] === idx;
               const correct = submitted && idx === q.correct_index;
               const wrong = submitted && picked && idx !== q.correct_index;
               return (
                 <button key={idx} disabled={submitted} onClick={() => setAnswers({ ...answers, [q.id]: idx })}
-                  className={`flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition ${
+                  className={`flex w-full items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm transition ${
                     correct ? "border-green-500 bg-green-500/10" : wrong ? "border-red-500 bg-red-500/10" :
                     picked ? "border-primary bg-primary/5" : "hover:bg-accent"
                   }`}>
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full border text-xs">{String.fromCharCode(65 + idx)}</span>
+                  <span className="flex h-6 w-6 items-center justify-center rounded-full border text-xs font-medium">{String.fromCharCode(65 + idx)}</span>
                   <span>{opt}</span>
                 </button>
               );
             })}
           </div>
           {submitted && q.explanation && (
-            <p className="mt-2 rounded-md bg-muted/50 p-2 text-xs text-muted-foreground"><Sparkles className="mr-1 inline h-3 w-3" />{q.explanation}</p>
+            <p className="mt-3 rounded-md bg-muted/50 p-3 text-xs text-muted-foreground"><Sparkles className="mr-1 inline h-3 w-3" />{q.explanation}</p>
           )}
         </div>
       ))}
       {!submitted ? (
-        <Button onClick={() => setSubmitted(true)} disabled={Object.keys(answers).length !== quizzes.length} className="bg-gradient-brand text-primary-foreground border-0">Submit answers</Button>
+        <Button onClick={() => setSubmitted(true)} disabled={Object.keys(answers).length !== quizzes.length} size="lg" className="bg-gradient-brand text-primary-foreground border-0">Submit answers</Button>
       ) : (
-        <div className="flex items-center justify-between rounded-xl border bg-card p-4">
+        <div className="flex items-center justify-between rounded-xl border bg-card p-5">
           <div className="flex items-center gap-2">
-            <Trophy className={`h-5 w-5 ${passed ? "text-yellow-500" : "text-muted-foreground"}`} />
+            <Trophy className={`h-6 w-6 ${passed ? "text-yellow-500" : "text-muted-foreground"}`} />
             <span className="text-sm font-medium">{score} / {quizzes.length} correct {passed && "— perfect! 🎉"}</span>
           </div>
           <div className="flex gap-2">
@@ -378,89 +361,4 @@ function QuizSection({ lessonId, onPass }: { lessonId: string; onPass: () => voi
       )}
     </div>
   );
-}
-
-/* ---------- Notes ---------- */
-function NotesSection({ lessonId }: { lessonId: string }) {
-  const { user } = useSession();
-  const [value, setValue] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    supabase.from("lesson_notes").select("content").eq("lesson_id", lessonId).maybeSingle().then(({ data }) => setValue(data?.content ?? ""));
-  }, [user, lessonId]);
-
-  const save = async () => {
-    if (!user) return;
-    setSaving(true);
-    const { error } = await supabase.from("lesson_notes").upsert({ user_id: user.id, lesson_id: lessonId, content: value }, { onConflict: "user_id,lesson_id" });
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("Notes saved");
-  };
-
-  return (
-    <div className="space-y-3">
-      <Textarea value={value} onChange={(e) => setValue(e.target.value)} placeholder="Jot down your thoughts, key takeaways, or questions for later…" className="min-h-[200px]" />
-      <Button onClick={save} disabled={saving} className="bg-gradient-brand text-primary-foreground border-0">{saving ? "Saving…" : "Save notes"}</Button>
-    </div>
-  );
-}
-
-/* ---------- AI Tutor ---------- */
-function TutorPanel({ lessonTitle }: { lessonTitle?: string }) {
-  const ask = useServerFn(askTutor);
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string }[]>([
-    { role: "assistant", content: `Hi! I'm your AI tutor. Ask me anything about **${lessonTitle ?? "this lesson"}** — I can explain code, fix errors, simplify concepts, or give you practice exercises.` },
-  ]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const send = async (text: string) => {
-    if (!text.trim()) return;
-    const next = [...messages, { role: "user" as const, content: text }];
-    setMessages(next); setInput(""); setLoading(true);
-    try {
-      const { reply } = await ask({ data: { messages: next } });
-      setMessages([...next, { role: "assistant", content: reply }]);
-    } catch (e) { toast.error((e as Error).message); }
-    finally { setLoading(false); }
-  };
-
-  const quick = useMemo(() => ["Explain this lesson simply", "Give me a practice exercise", "What are common mistakes?"], []);
-
-  return (
-    <>
-      <div className="mb-3 flex items-center gap-2 border-b pb-3">
-        <div className="bg-gradient-brand flex h-8 w-8 items-center justify-center rounded-lg text-primary-foreground"><Bot className="h-4 w-4" /></div>
-        <div>
-          <p className="text-sm font-semibold">AI Tutor</p>
-          <p className="text-[11px] text-muted-foreground">Always-on coding mentor</p>
-        </div>
-      </div>
-      <div className="flex-1 space-y-3 overflow-y-auto pr-1" style={{ maxHeight: 360 }}>
-        {messages.map((m, i) => (
-          <div key={i} className={`rounded-xl p-3 text-xs leading-relaxed ${m.role === "user" ? "ml-4 bg-primary/10" : "mr-4 bg-muted/60"}`}>
-            <p className="whitespace-pre-wrap">{m.content}</p>
-          </div>
-        ))}
-        {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-1">
-        {quick.map((q) => (
-          <button key={q} onClick={() => send(q)} className="rounded-full border bg-background px-2 py-1 text-[10px] text-muted-foreground hover:bg-accent">{q}</button>
-        ))}
-      </div>
-      <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="mt-2 flex gap-1">
-        <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Ask anything…" className="h-9 text-xs" />
-        <Button type="submit" size="sm" disabled={loading} className="bg-gradient-brand text-primary-foreground border-0"><Send className="h-3.5 w-3.5" /></Button>
-      </form>
-    </>
-  );
-}
-
-function fmt(v: unknown): string {
-  if (typeof v === "string") return v;
-  try { return JSON.stringify(v); } catch { return String(v); }
 }
