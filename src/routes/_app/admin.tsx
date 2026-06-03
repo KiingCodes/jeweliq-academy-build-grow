@@ -442,8 +442,8 @@ function ModuleDialog({ courseId, module, nextOrder, onClose }: { courseId: stri
     setSaving(true);
     const payload = { course_id: courseId, title, description, order_index: order };
     const q = module
-      ? supabase.from("modules" as never).update(payload).eq("id", module.id)
-      : supabase.from("modules" as never).insert(payload);
+      ? supabase.from("modules" as never).update(payload as never).eq("id", module.id)
+      : supabase.from("modules" as never).insert(payload as never);
     const { error } = await q;
     setSaving(false);
     if (error) return toast.error(error.message);
