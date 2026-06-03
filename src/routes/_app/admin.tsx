@@ -559,8 +559,8 @@ function LessonDialog({ courseId, moduleId, lesson, nextOrder, onClose }: { cour
     setSaving(true);
     const payload = { course_id: courseId, module_id: moduleId, title, content, lesson_type: type, video_url: videoUrl || null, duration_minutes: duration, difficulty, order_index: order };
     const q = lesson
-      ? supabase.from("lessons").update(payload).eq("id", lesson.id)
-      : supabase.from("lessons").insert(payload);
+      ? supabase.from("lessons").update(payload as never).eq("id", lesson.id)
+      : supabase.from("lessons").insert(payload as never);
     const { error } = await q;
     setSaving(false);
     if (error) return toast.error(error.message);
