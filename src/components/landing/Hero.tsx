@@ -20,15 +20,15 @@ export function Hero() {
             The premium academy for modern founders
           </div>
           <h1
-            style={{ fontFamily: "var(--font-hero)" }}
-            className="text-5xl font-light leading-[1.05] tracking-tight sm:text-7xl lg:text-[5.5rem]"
+            style={{ fontFamily: "var(--font-hero)", fontWeight: 800, fontVariationSettings: '"opsz" 96', letterSpacing: "-0.04em" }}
+            className="text-6xl leading-[0.95] sm:text-7xl lg:text-[6.5rem]"
           >
-            Build your <em className="not-italic text-gradient" style={{ fontStyle: "italic", fontWeight: 500 }}>online empire</em><br className="hidden sm:block" /> from anywhere.
+            Build your<br className="hidden sm:block" />
+            <span className="text-gradient">online empire.</span>
           </h1>
           <p className="mx-auto mt-7 max-w-xl text-base text-muted-foreground sm:text-lg">
             JewelIQ Academy is the premium platform for digital entrepreneurs. Master the
-            mindset, marketing, and money systems behind every successful online business —
-            with expert lessons, an AI coach, and a community of doers.
+            mindset, marketing, and money systems behind every successful online business.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg" className="bg-gradient-brand group rounded-xl border-0 text-primary-foreground shadow-glow">
@@ -38,11 +38,11 @@ export function Hero() {
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="rounded-xl">
-              <Link to="/courses">Browse courses</Link>
+              <Link to="/login">Sign in</Link>
             </Button>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            No credit card · Cancel anytime · Lifetime updates
+            No credit card · Enrollment-based access · Lifetime updates
           </p>
         </div>
 
@@ -50,10 +50,10 @@ export function Hero() {
           {[
             { k: "10k+", v: "Founders learning" },
             { k: "8", v: "Premium courses" },
-            { k: "24/7", v: "AI coaching" },
+            { k: "100%", v: "Action-driven" },
           ].map((s) => (
             <div key={s.v} className="glass rounded-2xl p-5">
-              <div style={{ fontFamily: "var(--font-hero)" }} className="text-3xl font-medium text-gradient sm:text-4xl">{s.k}</div>
+              <div style={{ fontFamily: "var(--font-hero)", fontWeight: 800, letterSpacing: "-0.03em" }} className="text-3xl text-gradient sm:text-4xl">{s.k}</div>
               <div className="mt-1 text-xs text-muted-foreground sm:text-sm">{s.v}</div>
             </div>
           ))}
