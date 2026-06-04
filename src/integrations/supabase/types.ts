@@ -240,6 +240,39 @@ export type Database = {
         }
         Relationships: []
       }
+      enrollment_requests: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          message: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          message?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          message?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       enrollments: {
         Row: {
           course_id: string
@@ -467,12 +500,46 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_attempts: {
+        Row: {
+          answers: Json | null
+          created_at: string
+          id: string
+          lesson_id: string
+          passed: boolean
+          score: number
+          total: number
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          created_at?: string
+          id?: string
+          lesson_id: string
+          passed?: boolean
+          score?: number
+          total?: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          created_at?: string
+          id?: string
+          lesson_id?: string
+          passed?: boolean
+          score?: number
+          total?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       quizzes: {
         Row: {
           correct_index: number
           created_at: string
           explanation: string | null
           id: string
+          is_published: boolean
           lesson_id: string
           options: Json
           order_index: number
@@ -483,6 +550,7 @@ export type Database = {
           created_at?: string
           explanation?: string | null
           id?: string
+          is_published?: boolean
           lesson_id: string
           options: Json
           order_index?: number
@@ -493,6 +561,7 @@ export type Database = {
           created_at?: string
           explanation?: string | null
           id?: string
+          is_published?: boolean
           lesson_id?: string
           options?: Json
           order_index?: number
