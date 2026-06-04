@@ -3,9 +3,18 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
   Shield, Users, BookOpen, Activity, DollarSign, Loader2, Lock, Megaphone,
-  Plus, Trash2, Pencil, ChevronDown, ChevronRight, Layers, HelpCircle, X,
+  Plus, Trash2, Pencil, ChevronDown, ChevronRight, Layers, ClipboardCheck, X,
+  Award, Inbox, GripVertical, Eye, EyeOff, Download,
 } from "lucide-react";
 import { toast } from "sonner";
+import {
+  DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { supabase } from "@/integrations/supabase/client";
 import { useRoles } from "@/hooks/use-roles";
 import { Button } from "@/components/ui/button";
@@ -15,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { downloadCertificate } from "@/lib/certificate-pdf";
 
 export const Route = createFileRoute("/_app/admin")({
   component: AdminDashboard,
@@ -28,24 +38,23 @@ function AdminDashboard() {
   const qc = useQueryClient();
 
   const { data: stats } = useQuery({
-    queryKey: ["admin-stats"],
-    enabled: isAdmin,
+    queryKey: ["admin-stats"], enabled: isAdmin,
     queryFn: async () => {
-      const [{ count: courses }, { count: profiles }, { count: enrollments }, { count: certs }] = await Promise.all([
+      const [{ count: courses }, { count: profiles }, { count: enrollments }, { count: certs }, { count: reqs }] = await Promise.all([
         supabase.from("courses").select("*", { count: "exact", head: true }),
         supabase.from("profiles").select("*", { count: "exact", head: true }),
         supabase.from("enrollments").select("*", { count: "exact", head: true }),
         supabase.from("certificates" as never).select("*", { count: "exact", head: true }),
+        supabase.from("enrollment_requests" as never).select("*", { count: "exact", head: true }).eq("status", "pending"),
       ]);
-      return { courses: courses ?? 0, users: profiles ?? 0, enrollments: enrollments ?? 0, certs: certs ?? 0 };
+      return { courses: courses ?? 0, users: profiles ?? 0, enrollments: enrollments ?? 0, certs: certs ?? 0, pending: reqs ?? 0 };
     },
   });
 
   const { data: users } = useQuery({
-    queryKey: ["admin-users"],
-    enabled: isAdmin,
+    queryKey: ["admin-users"], enabled: isAdmin,
     queryFn: async () => {
-      const { data: profiles } = await supabase.from("profiles").select("id, display_name, xp, streak_days, created_at").order("created_at", { ascending: false }).limit(100);
+      const { data: profiles } = await supabase.from("profiles").select("id, display_name, xp, streak_days, created_at").order("created_at", { ascending: false }).limit(200);
       const { data: roles } = await supabase.from("user_roles").select("user_id, role");
       const roleMap = new Map<string, string[]>();
       roles?.forEach((r) => { const list = roleMap.get(r.user_id) ?? []; list.push(r.role); roleMap.set(r.user_id, list); });
@@ -54,8 +63,7 @@ function AdminDashboard() {
   });
 
   const { data: courses } = useQuery({
-    queryKey: ["admin-courses"],
-    enabled: isAdmin,
+    queryKey: ["admin-courses"], enabled: isAdmin,
     queryFn: async () => (await supabase.from("courses").select("*").order("created_at", { ascending: false })).data ?? [],
   });
 
@@ -104,7 +112,7 @@ function AdminDashboard() {
     { label: "Users", value: stats?.users ?? 0, icon: Users },
     { label: "Courses", value: stats?.courses ?? 0, icon: BookOpen },
     { label: "Enrollments", value: stats?.enrollments ?? 0, icon: Activity },
-    { label: "Revenue", value: "$0", icon: DollarSign },
+    { label: "Pending requests", value: stats?.pending ?? 0, icon: Inbox },
   ];
 
   return (
@@ -132,30 +140,29 @@ function AdminDashboard() {
       <Tabs defaultValue="content">
         <TabsList className="flex-wrap">
           <TabsTrigger value="content">Content</TabsTrigger>
+          <TabsTrigger value="requests">Requests{(stats?.pending ?? 0) > 0 && <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{stats?.pending}</span>}</TabsTrigger>
+          <TabsTrigger value="certificates">Certificates</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="enroll">Enroll</TabsTrigger>
           <TabsTrigger value="announcements">Announcements</TabsTrigger>
-          <TabsTrigger value="settings">Settings</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="content" className="mt-4">
-          <ContentManager courses={courses ?? []} />
-        </TabsContent>
+        <TabsContent value="content" className="mt-4"><ContentManager courses={courses ?? []} /></TabsContent>
+
+        <TabsContent value="requests" className="mt-4"><RequestsPanel /></TabsContent>
+
+        <TabsContent value="certificates" className="mt-4"><CertificatesPanel users={users ?? []} courses={courses ?? []} /></TabsContent>
 
         <TabsContent value="enroll" className="mt-4">
           <div className="glass space-y-3 rounded-2xl p-5">
             <h3 className="font-semibold">Enroll a student in a course</h3>
             <Select value={enrollUser} onValueChange={setEnrollUser}>
               <SelectTrigger><SelectValue placeholder="Select student" /></SelectTrigger>
-              <SelectContent>
-                {users?.map((u) => (<SelectItem key={u.id} value={u.id}>{u.display_name ?? u.id.slice(0, 8)}</SelectItem>))}
-              </SelectContent>
+              <SelectContent>{users?.map((u) => (<SelectItem key={u.id} value={u.id}>{u.display_name ?? u.id.slice(0, 8)}</SelectItem>))}</SelectContent>
             </Select>
             <Select value={enrollCourse} onValueChange={setEnrollCourse}>
               <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
-              <SelectContent>
-                {courses?.map((c) => (<SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>))}
-              </SelectContent>
+              <SelectContent>{courses?.map((c) => (<SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>))}</SelectContent>
             </Select>
             <Button onClick={enrollStudent} className="bg-gradient-brand text-primary-foreground border-0"><Plus className="mr-1 h-4 w-4" />Enroll student</Button>
           </div>
@@ -193,18 +200,146 @@ function AdminDashboard() {
             <Button onClick={postAnn} className="bg-gradient-brand text-primary-foreground border-0"><Plus className="mr-1 h-4 w-4" />Publish</Button>
           </div>
         </TabsContent>
-
-        <TabsContent value="settings" className="mt-4">
-          <div className="glass rounded-2xl p-6">
-            <h3 className="font-display text-lg font-semibold">Platform settings</h3>
-            <p className="mt-2 text-sm text-muted-foreground">Branding, billing, integrations, and limits.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border p-3 text-sm"><strong>Total certificates issued:</strong> {stats?.certs ?? 0}</div>
-              <div className="rounded-xl border p-3 text-sm"><strong>Active platform:</strong> Lovable Cloud</div>
-            </div>
-          </div>
-        </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/* ===================== Enrollment Requests ===================== */
+function RequestsPanel() {
+  const qc = useQueryClient();
+  const { data: requests, isLoading } = useQuery({
+    queryKey: ["admin-requests"],
+    queryFn: async () => {
+      const { data } = await supabase.from("enrollment_requests" as never).select("*, courses(title)").order("created_at", { ascending: false });
+      return (data ?? []) as any[];
+    },
+  });
+
+  const approve = async (r: any) => {
+    if (!r.user_id) return toast.error("This request has no linked account. Ask the user to sign up first, then enroll manually.");
+    if (!r.course_id) return toast.error("No course specified — please enroll them manually.");
+    const { error: e1 } = await supabase.from("enrollments").insert({ user_id: r.user_id, course_id: r.course_id });
+    if (e1 && !e1.message.includes("duplicate")) return toast.error(e1.message);
+    await supabase.from("enrollment_requests" as never).update({ status: "approved" } as never).eq("id", r.id);
+    toast.success("Approved & enrolled");
+    qc.invalidateQueries({ queryKey: ["admin-requests"] });
+    qc.invalidateQueries({ queryKey: ["admin-stats"] });
+  };
+
+  const setStatus = async (id: string, status: string) => {
+    await supabase.from("enrollment_requests" as never).update({ status } as never).eq("id", id);
+    qc.invalidateQueries({ queryKey: ["admin-requests"] });
+    qc.invalidateQueries({ queryKey: ["admin-stats"] });
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm("Delete this request?")) return;
+    await supabase.from("enrollment_requests" as never).delete().eq("id", id);
+    qc.invalidateQueries({ queryKey: ["admin-requests"] });
+  };
+
+  if (isLoading) return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
+  if (!requests?.length) return <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">No enrollment requests yet.</div>;
+
+  return (
+    <div className="glass overflow-x-auto rounded-2xl">
+      <table className="w-full text-sm">
+        <thead className="border-b bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+          <tr><th className="p-3 text-left">When</th><th className="p-3 text-left">Name / Email</th><th className="p-3 text-left">Course</th><th className="p-3 text-left">Message</th><th className="p-3 text-left">Status</th><th className="p-3 text-right">Actions</th></tr>
+        </thead>
+        <tbody>
+          {requests.map((r) => (
+            <tr key={r.id} className="border-b last:border-0 align-top">
+              <td className="p-3 text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</td>
+              <td className="p-3"><div className="font-medium">{r.full_name ?? "—"}</div><div className="text-xs text-muted-foreground">{r.email}</div></td>
+              <td className="p-3 text-xs">{r.courses?.title ?? "Any"}</td>
+              <td className="p-3 text-xs text-muted-foreground max-w-xs">{r.message ?? "—"}</td>
+              <td className="p-3"><Badge variant={r.status === "approved" ? "default" : r.status === "rejected" ? "destructive" : "outline"}>{r.status}</Badge></td>
+              <td className="p-3 text-right">
+                {r.status === "pending" && (<>
+                  <Button size="sm" variant="ghost" onClick={() => approve(r)}>Approve</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setStatus(r.id, "rejected")}>Reject</Button>
+                </>)}
+                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(r.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/* ===================== Certificates Manual Issue ===================== */
+function CertificatesPanel({ users, courses }: { users: any[]; courses: any[] }) {
+  const qc = useQueryClient();
+  const [userId, setUserId] = useState("");
+  const [courseId, setCourseId] = useState("");
+
+  const { data: certs, isLoading } = useQuery({
+    queryKey: ["admin-certs"],
+    queryFn: async () => {
+      const { data } = await supabase.from("certificates" as never).select("*, courses(title), profiles(display_name)").order("issued_at", { ascending: false });
+      return (data ?? []) as any[];
+    },
+  });
+
+  const issue = async () => {
+    if (!userId || !courseId) return toast.error("Pick a student and course");
+    const { error } = await supabase.from("certificates" as never).insert({ user_id: userId, course_id: courseId } as never);
+    if (error) return toast.error(error.message);
+    toast.success("Certificate issued");
+    qc.invalidateQueries({ queryKey: ["admin-certs"] });
+    setUserId(""); setCourseId("");
+  };
+
+  const remove = async (id: string) => {
+    if (!confirm("Revoke this certificate?")) return;
+    await supabase.from("certificates" as never).delete().eq("id", id);
+    qc.invalidateQueries({ queryKey: ["admin-certs"] });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="glass space-y-3 rounded-2xl p-5">
+        <h3 className="flex items-center gap-2 font-semibold"><Award className="h-4 w-4 text-primary" /> Issue certificate manually</h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Select value={userId} onValueChange={setUserId}>
+            <SelectTrigger><SelectValue placeholder="Select student" /></SelectTrigger>
+            <SelectContent>{users.map((u) => <SelectItem key={u.id} value={u.id}>{u.display_name ?? u.id.slice(0, 8)}</SelectItem>)}</SelectContent>
+          </Select>
+          <Select value={courseId} onValueChange={setCourseId}>
+            <SelectTrigger><SelectValue placeholder="Select course" /></SelectTrigger>
+            <SelectContent>{courses.map((c) => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+        <Button onClick={issue} className="bg-gradient-brand text-primary-foreground border-0"><Award className="mr-1 h-4 w-4" />Issue certificate</Button>
+      </div>
+
+      <div className="glass overflow-x-auto rounded-2xl">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+            <tr><th className="p-3 text-left">Issued</th><th className="p-3 text-left">Student</th><th className="p-3 text-left">Course</th><th className="p-3 text-left">Code</th><th className="p-3 text-right">Actions</th></tr>
+          </thead>
+          <tbody>
+            {isLoading ? <tr><td className="p-6 text-center" colSpan={5}><Loader2 className="mx-auto h-4 w-4 animate-spin" /></td></tr> :
+              certs?.map((c) => (
+                <tr key={c.id} className="border-b last:border-0">
+                  <td className="p-3 text-xs">{new Date(c.issued_at).toLocaleDateString()}</td>
+                  <td className="p-3">{c.profiles?.display_name ?? c.user_id.slice(0, 8)}</td>
+                  <td className="p-3 text-xs">{c.courses?.title ?? "—"}</td>
+                  <td className="p-3 font-mono text-xs">{c.cert_code}</td>
+                  <td className="p-3 text-right">
+                    <Button size="sm" variant="ghost" onClick={() => downloadCertificate({ name: c.profiles?.display_name ?? "Student", course: c.courses?.title ?? "Course", code: c.cert_code, date: new Date(c.issued_at).toLocaleDateString() })}><Download className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                  </td>
+                </tr>
+              ))}
+            {!isLoading && !certs?.length && <tr><td className="p-6 text-center text-muted-foreground" colSpan={5}>No certificates issued yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -240,9 +375,7 @@ function ContentManager({ courses }: { courses: Course[] }) {
       <aside className="rounded-2xl border bg-card p-3">
         <div className="flex items-center justify-between px-2 pb-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Courses</p>
-          <Button size="sm" variant="ghost" onClick={() => { setEditingCourse(null); setShowCourseDialog(true); }}>
-            <Plus className="h-3.5 w-3.5" />
-          </Button>
+          <Button size="sm" variant="ghost" onClick={() => { setEditingCourse(null); setShowCourseDialog(true); }}><Plus className="h-3.5 w-3.5" /></Button>
         </div>
         <ul className="space-y-1">
           {courses.map((c) => (
@@ -276,14 +409,10 @@ function ContentManager({ courses }: { courses: Course[] }) {
                 <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteCourse(selected.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
               </div>
             </div>
-            <div className="mt-6">
-              <ModulesPanel courseId={selected.id} />
-            </div>
+            <div className="mt-6"><ModulesPanel courseId={selected.id} /></div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-dashed bg-card p-10 text-center text-sm text-muted-foreground">
-            Create a course to get started.
-          </div>
+          <div className="rounded-2xl border border-dashed bg-card p-10 text-center text-sm text-muted-foreground">Create a course to get started.</div>
         )}
       </div>
 
@@ -294,7 +423,6 @@ function ContentManager({ courses }: { courses: Course[] }) {
   );
 }
 
-/* ----- Course dialog ----- */
 function CourseDialog({ course, onClose, onSaved }: { course: Course | null; onClose: () => void; onSaved: (c: Course) => void }) {
   const qc = useQueryClient();
   const [title, setTitle] = useState(course?.title ?? "");
@@ -327,7 +455,7 @@ function CourseDialog({ course, onClose, onSaved }: { course: Course | null; onC
           <div><label className="text-xs font-medium">Title</label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
           <div><label className="text-xs font-medium">Description</label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} /></div>
           <div className="grid grid-cols-2 gap-3">
-            <div><label className="text-xs font-medium">Category</label><Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Foundations, Marketing…" /></div>
+            <div><label className="text-xs font-medium">Category</label><Input value={category} onChange={(e) => setCategory(e.target.value)} /></div>
             <div>
               <label className="text-xs font-medium">Level</label>
               <Select value={level} onValueChange={setLevel}>
@@ -368,6 +496,18 @@ function ModulesPanel({ courseId }: { courseId: string }) {
     },
   });
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+
+  const handleDragEnd = async (e: DragEndEvent) => {
+    if (!e.over || e.active.id === e.over.id || !modules) return;
+    const oldIdx = modules.findIndex((m) => m.id === e.active.id);
+    const newIdx = modules.findIndex((m) => m.id === e.over!.id);
+    const reordered = arrayMove(modules, oldIdx, newIdx);
+    qc.setQueryData(["admin-modules", courseId], reordered.map((m, i) => ({ ...m, order_index: i })));
+    await Promise.all(reordered.map((m, i) => supabase.from("modules" as never).update({ order_index: i } as never).eq("id", m.id)));
+    qc.invalidateQueries({ queryKey: ["admin-modules", courseId] });
+  };
+
   const remove = async (id: string) => {
     if (!confirm("Delete this module? Lessons inside it will become unassigned.")) return;
     const { error } = await supabase.from("modules" as never).delete().eq("id", id);
@@ -378,44 +518,26 @@ function ModulesPanel({ courseId }: { courseId: string }) {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 font-semibold"><Layers className="h-4 w-4 text-primary" /> Modules</h3>
-        <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }} className="bg-gradient-brand text-primary-foreground border-0">
-          <Plus className="mr-1 h-3.5 w-3.5" />Add module
-        </Button>
+        <h3 className="flex items-center gap-2 font-semibold"><Layers className="h-4 w-4 text-primary" /> Modules <span className="text-xs font-normal text-muted-foreground">(drag to reorder)</span></h3>
+        <Button size="sm" onClick={() => { setEditing(null); setShowDialog(true); }} className="bg-gradient-brand text-primary-foreground border-0"><Plus className="mr-1 h-3.5 w-3.5" />Add module</Button>
       </div>
 
       {isLoading ? <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /> : (
         <div className="space-y-3">
-          {modules?.map((m) => {
-            const open = openIds[m.id] ?? true;
-            return (
-              <div key={m.id} className="rounded-xl border bg-background/50">
-                <div className="flex items-center gap-2 p-3">
-                  <button onClick={() => setOpenIds({ ...openIds, [m.id]: !open })} className="text-muted-foreground">
-                    {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </button>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{m.order_index + 1}. {m.title}</p>
-                    {m.description && <p className="truncate text-xs text-muted-foreground">{m.description}</p>}
-                  </div>
-                  <Button size="sm" variant="ghost" onClick={() => { setEditing(m); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(m.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                </div>
-                {open && (
-                  <div className="border-t p-3">
-                    <LessonsPanel courseId={courseId} moduleId={m.id} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={modules?.map((m) => m.id) ?? []} strategy={verticalListSortingStrategy}>
+              {modules?.map((m) => {
+                const open = openIds[m.id] ?? true;
+                return (
+                  <SortableModuleRow key={m.id} module={m} open={open} onToggle={() => setOpenIds({ ...openIds, [m.id]: !open })}
+                    onEdit={() => { setEditing(m); setShowDialog(true); }} onDelete={() => remove(m.id)} courseId={courseId} />
+                );
+              })}
+            </SortableContext>
+          </DndContext>
           {modules?.length === 0 && (
-            <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No modules yet. Add your first module to start structuring this course.
-            </div>
+            <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No modules yet. Add your first module to start structuring this course.</div>
           )}
-
-          {/* Unassigned lessons */}
           <div className="rounded-xl border border-dashed bg-background/30 p-3">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unassigned lessons</p>
             <LessonsPanel courseId={courseId} moduleId={null} />
@@ -423,43 +545,61 @@ function ModulesPanel({ courseId }: { courseId: string }) {
         </div>
       )}
 
-      {showDialog && (
-        <ModuleDialog courseId={courseId} module={editing} nextOrder={modules?.length ?? 0} onClose={() => setShowDialog(false)} />
-      )}
+      {showDialog && <ModuleDialog courseId={courseId} module={editing} nextOrder={modules?.length ?? 0} onClose={() => setShowDialog(false)} />}
     </div>
   );
 }
 
-function ModuleDialog({ courseId, module, nextOrder, onClose }: { courseId: string; module: Module | null; nextOrder: number; onClose: () => void }) {
+function SortableModuleRow({ module: m, open, onToggle, onEdit, onDelete, courseId }: {
+  module: Module; open: boolean; onToggle: () => void; onEdit: () => void; onDelete: () => void; courseId: string;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: m.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <div ref={setNodeRef} style={style} className="rounded-xl border bg-background/50">
+      <div className="flex items-center gap-2 p-3">
+        <button {...attributes} {...listeners} className="cursor-grab touch-none text-muted-foreground hover:text-foreground"><GripVertical className="h-4 w-4" /></button>
+        <button onClick={onToggle} className="text-muted-foreground">{open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{m.title}</p>
+          {m.description && <p className="truncate text-xs text-muted-foreground">{m.description}</p>}
+        </div>
+        <Button size="sm" variant="ghost" onClick={onEdit}><Pencil className="h-3.5 w-3.5" /></Button>
+        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={onDelete}><Trash2 className="h-3.5 w-3.5" /></Button>
+      </div>
+      {open && <div className="border-t p-3"><LessonsPanel courseId={courseId} moduleId={m.id} /></div>}
+    </div>
+  );
+}
+
+function ModuleDialog({ courseId, module: m, nextOrder, onClose }: { courseId: string; module: Module | null; nextOrder: number; onClose: () => void }) {
   const qc = useQueryClient();
-  const [title, setTitle] = useState(module?.title ?? "");
-  const [description, setDescription] = useState(module?.description ?? "");
-  const [order, setOrder] = useState(module?.order_index ?? nextOrder);
+  const [title, setTitle] = useState(m?.title ?? "");
+  const [description, setDescription] = useState(m?.description ?? "");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (!title.trim()) return toast.error("Title required");
     setSaving(true);
-    const payload = { course_id: courseId, title, description, order_index: order };
-    const q = module
-      ? supabase.from("modules" as never).update(payload as never).eq("id", module.id)
+    const payload = { course_id: courseId, title, description, order_index: m?.order_index ?? nextOrder };
+    const q = m
+      ? supabase.from("modules" as never).update(payload as never).eq("id", m.id)
       : supabase.from("modules" as never).insert(payload as never);
     const { error } = await q;
     setSaving(false);
     if (error) return toast.error(error.message);
     qc.invalidateQueries({ queryKey: ["admin-modules", courseId] });
-    toast.success(module ? "Module updated" : "Module created");
+    toast.success(m ? "Module updated" : "Module created");
     onClose();
   };
 
   return (
     <Dialog open onOpenChange={onClose}>
       <DialogContent>
-        <DialogHeader><DialogTitle>{module ? "Edit module" : "New module"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{m ? "Edit module" : "New module"}</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div><label className="text-xs font-medium">Title</label><Input value={title} onChange={(e) => setTitle(e.target.value)} /></div>
           <div><label className="text-xs font-medium">Description</label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} /></div>
-          <div><label className="text-xs font-medium">Order</label><Input type="number" value={order} onChange={(e) => setOrder(Number(e.target.value))} /></div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -493,6 +633,17 @@ function LessonsPanel({ courseId, moduleId }: { courseId: string; moduleId: stri
     },
   });
 
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  const handleDragEnd = async (e: DragEndEvent) => {
+    if (!e.over || e.active.id === e.over.id || !lessons) return;
+    const oldIdx = lessons.findIndex((l) => l.id === e.active.id);
+    const newIdx = lessons.findIndex((l) => l.id === e.over!.id);
+    const reordered = arrayMove(lessons, oldIdx, newIdx);
+    qc.setQueryData(["admin-lessons", courseId, moduleId], reordered.map((l, i) => ({ ...l, order_index: i })));
+    await Promise.all(reordered.map((l, i) => supabase.from("lessons").update({ order_index: i }).eq("id", l.id)));
+    qc.invalidateQueries({ queryKey: ["admin-lessons", courseId, moduleId] });
+  };
+
   const remove = async (id: string) => {
     if (!confirm("Delete this lesson?")) return;
     const { error } = await supabase.from("lessons").delete().eq("id", id);
@@ -503,32 +654,40 @@ function LessonsPanel({ courseId, moduleId }: { courseId: string; moduleId: stri
   return (
     <div>
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground">Lessons {lessons?.length ? `(${lessons.length})` : ""}</p>
-        <Button size="sm" variant="outline" onClick={() => { setEditing(null); setShowDialog(true); }}>
-          <Plus className="mr-1 h-3.5 w-3.5" />Add lesson
-        </Button>
+        <p className="text-xs font-medium text-muted-foreground">Lessons {lessons?.length ? `(${lessons.length}) — drag to reorder` : ""}</p>
+        <Button size="sm" variant="outline" onClick={() => { setEditing(null); setShowDialog(true); }}><Plus className="mr-1 h-3.5 w-3.5" />Add lesson</Button>
       </div>
       {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : (
-        <ul className="space-y-1.5">
-          {lessons?.map((l) => (
-            <li key={l.id} className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-xs">
-              <span className="font-mono text-muted-foreground">{l.order_index + 1}.</span>
-              <span className="min-w-0 flex-1 truncate font-medium">{l.title}</span>
-              <Badge variant="outline" className="text-[10px]">{l.lesson_type}</Badge>
-              <Button size="sm" variant="ghost" onClick={() => setQuizFor(l)}><HelpCircle className="h-3.5 w-3.5" /></Button>
-              <Button size="sm" variant="ghost" onClick={() => { setEditing(l); setShowDialog(true); }}><Pencil className="h-3.5 w-3.5" /></Button>
-              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(l.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
-            </li>
-          ))}
-          {lessons?.length === 0 && <p className="py-3 text-center text-xs text-muted-foreground">No lessons here yet.</p>}
-        </ul>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={lessons?.map((l) => l.id) ?? []} strategy={verticalListSortingStrategy}>
+            <ul className="space-y-1.5">
+              {lessons?.map((l) => (
+                <SortableLessonRow key={l.id} lesson={l} onEdit={() => { setEditing(l); setShowDialog(true); }} onDelete={() => remove(l.id)} onQuiz={() => setQuizFor(l)} />
+              ))}
+              {lessons?.length === 0 && <p className="py-3 text-center text-xs text-muted-foreground">No lessons here yet.</p>}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
 
-      {showDialog && (
-        <LessonDialog courseId={courseId} moduleId={moduleId} lesson={editing} nextOrder={lessons?.length ?? 0} onClose={() => setShowDialog(false)} />
-      )}
+      {showDialog && <LessonDialog courseId={courseId} moduleId={moduleId} lesson={editing} nextOrder={lessons?.length ?? 0} onClose={() => setShowDialog(false)} />}
       {quizFor && <QuizDialog lesson={quizFor} onClose={() => setQuizFor(null)} />}
     </div>
+  );
+}
+
+function SortableLessonRow({ lesson: l, onEdit, onDelete, onQuiz }: { lesson: Lesson; onEdit: () => void; onDelete: () => void; onQuiz: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: l.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <li ref={setNodeRef} style={style} className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-xs">
+      <button {...attributes} {...listeners} className="cursor-grab touch-none text-muted-foreground hover:text-foreground"><GripVertical className="h-3.5 w-3.5" /></button>
+      <span className="min-w-0 flex-1 truncate font-medium">{l.title}</span>
+      <Badge variant="outline" className="text-[10px]">{l.lesson_type}</Badge>
+      <Button size="sm" variant="ghost" title="Assessment" onClick={onQuiz}><ClipboardCheck className="h-3.5 w-3.5" /></Button>
+      <Button size="sm" variant="ghost" onClick={onEdit}><Pencil className="h-3.5 w-3.5" /></Button>
+      <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={onDelete}><Trash2 className="h-3.5 w-3.5" /></Button>
+    </li>
   );
 }
 
@@ -540,7 +699,6 @@ function LessonDialog({ courseId, moduleId, lesson, nextOrder, onClose }: { cour
   const [videoUrl, setVideoUrl] = useState(lesson?.video_url ?? "");
   const [duration, setDuration] = useState(lesson?.duration_minutes ?? 5);
   const [difficulty, setDifficulty] = useState(lesson?.difficulty ?? "beginner");
-  const [order, setOrder] = useState(lesson?.order_index ?? nextOrder);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -557,7 +715,7 @@ function LessonDialog({ courseId, moduleId, lesson, nextOrder, onClose }: { cour
   const save = async () => {
     if (!title.trim()) return toast.error("Title required");
     setSaving(true);
-    const payload = { course_id: courseId, module_id: moduleId, title, content, lesson_type: type, video_url: videoUrl || null, duration_minutes: duration, difficulty, order_index: order };
+    const payload = { course_id: courseId, module_id: moduleId, title, content, lesson_type: type, video_url: videoUrl || null, duration_minutes: duration, difficulty, order_index: lesson?.order_index ?? nextOrder };
     const q = lesson
       ? supabase.from("lessons").update(payload as never).eq("id", lesson.id)
       : supabase.from("lessons").insert(payload as never);
@@ -612,10 +770,9 @@ function LessonDialog({ courseId, moduleId, lesson, nextOrder, onClose }: { cour
             </div>
           </div>
           <div>
-            <label className="text-xs font-medium">Content (markdown / plain text)</label>
-            <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} placeholder="Write the lesson content here. Supports plain text and basic markdown." />
+            <label className="text-xs font-medium">Content (text or markdown — split into pages with blank lines)</label>
+            <Textarea value={content} onChange={(e) => setContent(e.target.value)} rows={12} placeholder="Write the lesson content here. Paragraphs are paginated automatically for the next-button reading flow." />
           </div>
-          <div><label className="text-xs font-medium">Order</label><Input type="number" value={order} onChange={(e) => setOrder(Number(e.target.value))} /></div>
         </div>
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
@@ -626,8 +783,8 @@ function LessonDialog({ courseId, moduleId, lesson, nextOrder, onClose }: { cour
   );
 }
 
-/* ===================== Quizzes ===================== */
-type Quiz = { id: string; lesson_id: string; question: string; options: string[]; correct_index: number; explanation: string | null; order_index: number };
+/* ===================== Assessments (Quizzes) ===================== */
+type Quiz = { id: string; lesson_id: string; question: string; options: string[]; correct_index: number; explanation: string | null; order_index: number; is_published: boolean };
 
 function QuizDialog({ lesson, onClose }: { lesson: Lesson; onClose: () => void }) {
   const qc = useQueryClient();
@@ -638,6 +795,17 @@ function QuizDialog({ lesson, onClose }: { lesson: Lesson; onClose: () => void }
       return (data ?? []) as unknown as Quiz[];
     },
   });
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }));
+  const handleDragEnd = async (e: DragEndEvent) => {
+    if (!e.over || e.active.id === e.over.id || !quizzes) return;
+    const oldIdx = quizzes.findIndex((q) => q.id === e.active.id);
+    const newIdx = quizzes.findIndex((q) => q.id === e.over!.id);
+    const reordered = arrayMove(quizzes, oldIdx, newIdx);
+    qc.setQueryData(["admin-quizzes", lesson.id], reordered.map((q, i) => ({ ...q, order_index: i })));
+    await Promise.all(reordered.map((q, i) => supabase.from("quizzes").update({ order_index: i }).eq("id", q.id)));
+    qc.invalidateQueries({ queryKey: ["admin-quizzes", lesson.id] });
+  };
 
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState<string[]>(["", "", "", ""]);
@@ -661,6 +829,11 @@ function QuizDialog({ lesson, onClose }: { lesson: Lesson; onClose: () => void }
     toast.success("Question added");
   };
 
+  const togglePublished = async (q: Quiz) => {
+    await supabase.from("quizzes").update({ is_published: !q.is_published } as never).eq("id", q.id);
+    qc.invalidateQueries({ queryKey: ["admin-quizzes", lesson.id] });
+  };
+
   const remove = async (id: string) => {
     const { error } = await supabase.from("quizzes").delete().eq("id", id);
     if (error) return toast.error(error.message);
@@ -671,26 +844,21 @@ function QuizDialog({ lesson, onClose }: { lesson: Lesson; onClose: () => void }
     <Dialog open onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><HelpCircle className="h-4 w-4 text-primary" /> Quiz · {lesson.title}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4 text-primary" /> Assessment · {lesson.title}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Existing questions</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Existing questions (drag to reorder)</p>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : quizzes?.length ? (
-            <ul className="space-y-2">
-              {quizzes.map((q, i) => (
-                <li key={q.id} className="rounded-lg border bg-background/50 p-3 text-xs">
-                  <div className="flex items-start gap-2">
-                    <span className="font-mono text-muted-foreground">{i + 1}.</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{q.question}</p>
-                      <p className="mt-1 text-muted-foreground">✓ {q.options[q.correct_index]}</p>
-                    </div>
-                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(q.id)}><X className="h-3.5 w-3.5" /></Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={quizzes.map((q) => q.id)} strategy={verticalListSortingStrategy}>
+                <ul className="space-y-2">
+                  {quizzes.map((q, i) => (
+                    <SortableQuizRow key={q.id} quiz={q} index={i} onTogglePublished={() => togglePublished(q)} onDelete={() => remove(q.id)} />
+                  ))}
+                </ul>
+              </SortableContext>
+            </DndContext>
           ) : <p className="text-xs text-muted-foreground">No questions yet.</p>}
 
           <div className="rounded-xl border bg-card p-4">
@@ -698,7 +866,7 @@ function QuizDialog({ lesson, onClose }: { lesson: Lesson; onClose: () => void }
             <div className="space-y-3">
               <div><label className="text-xs font-medium">Question</label><Textarea value={question} onChange={(e) => setQuestion(e.target.value)} rows={2} /></div>
               <div className="space-y-2">
-                <label className="text-xs font-medium">Options (click radio for correct answer)</label>
+                <label className="text-xs font-medium">Options (select correct answer)</label>
                 {options.map((opt, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <input type="radio" name="correct" checked={correct === i} onChange={() => setCorrect(i)} />
@@ -715,5 +883,26 @@ function QuizDialog({ lesson, onClose }: { lesson: Lesson; onClose: () => void }
         <DialogFooter><Button onClick={onClose}>Done</Button></DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SortableQuizRow({ quiz: q, index, onTogglePublished, onDelete }: { quiz: Quiz; index: number; onTogglePublished: () => void; onDelete: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: q.id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
+  return (
+    <li ref={setNodeRef} style={style} className="rounded-lg border bg-background/50 p-3 text-xs">
+      <div className="flex items-start gap-2">
+        <button {...attributes} {...listeners} className="mt-0.5 cursor-grab touch-none text-muted-foreground hover:text-foreground"><GripVertical className="h-3.5 w-3.5" /></button>
+        <span className="font-mono text-muted-foreground">{index + 1}.</span>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium">{q.question}</p>
+          <p className="mt-1 text-muted-foreground">✓ {q.options[q.correct_index]}</p>
+        </div>
+        <Button size="sm" variant="ghost" title={q.is_published ? "Unpublish" : "Publish"} onClick={onTogglePublished}>
+          {q.is_published ? <Eye className="h-3.5 w-3.5 text-primary" /> : <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />}
+        </Button>
+        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={onDelete}><X className="h-3.5 w-3.5" /></Button>
+      </div>
+    </li>
   );
 }
