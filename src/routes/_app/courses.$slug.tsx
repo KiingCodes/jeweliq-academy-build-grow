@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check, Circle, Loader2, ArrowLeft, PlayCircle, Bookmark, BookmarkCheck,
-  BookOpen, HelpCircle, Sparkles, Trophy, Lock, ChevronDown, ChevronRight, Mail,
+  BookOpen, ClipboardCheck, Sparkles, Trophy, Lock, ChevronDown, ChevronRight,
+  Send, ArrowRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -24,7 +25,7 @@ type Lesson = {
   module_id: string | null;
 };
 type Module = { id: string; title: string; description: string | null; order_index: number };
-type Quiz = { id: string; question: string; options: string[]; correct_index: number; explanation: string | null; order_index: number };
+type Quiz = { id: string; question: string; options: string[]; correct_index: number; explanation: string | null; order_index: number; is_published?: boolean };
 
 function CourseDetail() {
   const { slug } = Route.useParams();
@@ -34,6 +35,7 @@ function CourseDetail() {
   const [selectedLesson, setSelectedLesson] = useState<string | null>(null);
   const [tab, setTab] = useState("read");
   const [openModules, setOpenModules] = useState<Record<string, boolean>>({});
+  const [page, setPage] = useState(0);
 
   const { data: course, isLoading } = useQuery({
     queryKey: ["course", slug],
@@ -84,6 +86,11 @@ function CourseDetail() {
     }
   }, [modules, openModules]);
 
+  useEffect(() => { setPage(0); }, [active?.id]);
+
+  // Paginate lesson content into ~700-char chunks for "next" pagination
+  const pages = useMemo(() => paginate(active?.content ?? ""), [active?.content]);
+
   if (isLoading) return <div className="flex h-96 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (!course) return <div className="text-center text-muted-foreground">Course not found.</div>;
 
@@ -100,11 +107,11 @@ function CourseDetail() {
           <Lock className="mx-auto h-10 w-10 text-muted-foreground" />
           <h1 className="font-display mt-4 text-2xl font-semibold">{course.title}</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            This course is for enrolled students only. Reach out to be added to the program.
+            This course is for enrolled students only. Request access from the Courses page.
           </p>
-          <a href={`mailto:hello@jeweliq.academy?subject=Access to ${course.title}`} className="bg-gradient-brand mt-6 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium text-primary-foreground shadow-soft">
-            <Mail className="h-4 w-4" /> Request enrollment
-          </a>
+          <Button asChild className="bg-gradient-brand mt-6 text-primary-foreground border-0">
+            <Link to="/courses"><Send className="mr-1 h-4 w-4" /> Request enrollment</Link>
+          </Button>
         </div>
       </div>
     );
@@ -114,27 +121,37 @@ function CourseDetail() {
   const percent = lessons.length ? Math.round((completedIds.size / lessons.length) * 100) : 0;
   const isBookmarked = active && bookmarks?.includes(active.id);
   const unassigned = lessons.filter((l) => !l.module_id);
+  const activeIndex = active ? lessons.findIndex((l) => l.id === active.id) : -1;
+  const nextLesson = activeIndex >= 0 ? lessons[activeIndex + 1] : null;
 
-  const toggleComplete = async () => {
+  const markComplete = async (silent = false) => {
     if (!user || !active) return;
-    const already = completedIds.has(active.id);
+    if (completedIds.has(active.id)) return;
     const { error } = await supabase.from("lesson_progress").upsert(
-      { user_id: user.id, lesson_id: active.id, completed: !already, completed_at: !already ? new Date().toISOString() : null },
+      { user_id: user.id, lesson_id: active.id, completed: true, completed_at: new Date().toISOString() },
       { onConflict: "user_id,lesson_id" },
     );
     if (error) return toast.error(error.message);
-    if (!already) toast.success("+25 XP — lesson complete! 🎉");
+    if (!silent) toast.success("+25 XP — lesson complete! 🎉");
     qc.invalidateQueries({ queryKey: ["lesson-progress"] });
   };
 
   const toggleBookmark = async () => {
     if (!user || !active) return;
-    if (isBookmarked) {
-      await supabase.from("bookmarks").delete().eq("lesson_id", active.id);
-    } else {
-      await supabase.from("bookmarks").insert({ user_id: user.id, lesson_id: active.id });
-    }
+    if (isBookmarked) await supabase.from("bookmarks").delete().eq("lesson_id", active.id);
+    else await supabase.from("bookmarks").insert({ user_id: user.id, lesson_id: active.id });
     qc.invalidateQueries({ queryKey: ["bookmarks"] });
+  };
+
+  const handleNext = async () => {
+    if (page < pages.length - 1) {
+      setPage(page + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      // last page — auto mark complete
+      await markComplete();
+      if (nextLesson) { setSelectedLesson(nextLesson.id); setTab("read"); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    }
   };
 
   const lessonItem = (l: Lesson) => {
@@ -154,13 +171,15 @@ function CourseDetail() {
     );
   };
 
+  const totalPages = Math.max(1, pages.length);
+  const lessonPercent = Math.round(((page + 1) / totalPages) * 100);
+
   return (
     <div>
       <Link to="/courses" className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back to courses
       </Link>
 
-      {/* Sticky progress */}
       <div className="glass sticky top-0 z-20 -mx-4 mb-4 flex items-center gap-3 rounded-none border-b px-4 py-2 sm:mx-0 sm:rounded-2xl sm:border">
         <div className="min-w-0 flex-1">
           <p className="truncate text-xs font-medium">{course.title}</p>
@@ -172,7 +191,6 @@ function CourseDetail() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-        {/* Sidebar with modules */}
         <aside className="rounded-2xl border bg-card p-3 lg:sticky lg:top-20 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto">
           <p className="px-2 pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Curriculum</p>
           {modules.map((m) => {
@@ -202,7 +220,6 @@ function CourseDetail() {
           {lessons.length === 0 && <p className="px-2 py-6 text-center text-xs text-muted-foreground">No lessons yet.</p>}
         </aside>
 
-        {/* Main content — full width now */}
         <div className="min-w-0">
           {active ? (
             <article className="rounded-2xl border bg-card p-6 shadow-soft sm:p-10">
@@ -220,21 +237,41 @@ function CourseDetail() {
               <Tabs value={tab} onValueChange={setTab} className="mt-6">
                 <TabsList>
                   <TabsTrigger value="read"><BookOpen className="mr-1 h-3.5 w-3.5" />Lesson</TabsTrigger>
-                  <TabsTrigger value="quiz"><HelpCircle className="mr-1 h-3.5 w-3.5" />Quiz</TabsTrigger>
+                  <TabsTrigger value="quiz"><ClipboardCheck className="mr-1 h-3.5 w-3.5" />Assessments</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="read" className="mt-6">
-                  <ReadingView lesson={active} />
-                  <div className="mt-10 flex items-center justify-between gap-3 border-t pt-6">
-                    <p className="text-xs text-muted-foreground">When you're done reading, mark this lesson complete.</p>
-                    <Button onClick={toggleComplete} variant={completedIds.has(active.id) ? "outline" : "default"} className={completedIds.has(active.id) ? "" : "bg-gradient-brand text-primary-foreground border-0"}>
-                      {completedIds.has(active.id) ? "Completed ✓" : "Mark complete +25 XP"}
+                  {page === 0 && <LessonMedia lesson={active} />}
+                  <div className="prose-content mt-6 whitespace-pre-wrap text-[17px] leading-[1.75] text-foreground/90">
+                    {pages[page] || (
+                      !active.video_url ? <p className="text-sm text-muted-foreground">Lesson content coming soon.</p> : null
+                    )}
+                  </div>
+
+                  {/* Reading progress */}
+                  <div className="mt-8 flex items-center gap-3">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div className="bg-gradient-brand h-full transition-all" style={{ width: `${lessonPercent}%` }} />
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground">Page {page + 1} of {totalPages}</span>
+                  </div>
+
+                  <div className="mt-6 flex items-center justify-between gap-3 border-t pt-6">
+                    <Button variant="outline" disabled={page === 0} onClick={() => { setPage(page - 1); window.scrollTo({ top: 0, behavior: "smooth" }); }}>
+                      Previous
                     </Button>
+                    <div className="flex items-center gap-2">
+                      {completedIds.has(active.id) && <Badge variant="outline" className="text-primary border-primary">Completed ✓</Badge>}
+                      <Button onClick={handleNext} className="bg-gradient-brand text-primary-foreground border-0">
+                        {page < totalPages - 1 ? "Next" : nextLesson ? "Finish & continue" : "Mark complete"}
+                        <ArrowRight className="ml-1 h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="quiz" className="mt-6">
-                  <QuizSection lessonId={active.id} onPass={toggleComplete} />
+                  <QuizSection lessonId={active.id} isStaff={isStaff} onPass={() => markComplete()} />
                 </TabsContent>
               </Tabs>
             </article>
@@ -245,20 +282,21 @@ function CourseDetail() {
   );
 }
 
-/* ---------- Reading view ---------- */
-function ReadingView({ lesson }: { lesson: Lesson }) {
-  return (
-    <div className="space-y-6">
-      <LessonMedia lesson={lesson} />
-      {lesson.content ? (
-        <div className="prose-content whitespace-pre-wrap text-[17px] leading-[1.75] text-foreground/90">
-          {lesson.content}
-        </div>
-      ) : (
-        !lesson.video_url && <p className="text-sm text-muted-foreground">Lesson content coming soon.</p>
-      )}
-    </div>
-  );
+function paginate(content: string): string[] {
+  if (!content?.trim()) return [""];
+  const paragraphs = content.split(/\n\n+/);
+  const pages: string[] = [];
+  let buf = "";
+  const target = 900;
+  for (const p of paragraphs) {
+    if ((buf + "\n\n" + p).length > target && buf) {
+      pages.push(buf.trim()); buf = p;
+    } else {
+      buf = buf ? buf + "\n\n" + p : p;
+    }
+  }
+  if (buf) pages.push(buf.trim());
+  return pages.length ? pages : [content];
 }
 
 function LessonMedia({ lesson }: { lesson: Lesson }) {
@@ -272,39 +310,24 @@ function LessonMedia({ lesson }: { lesson: Lesson }) {
       </div>
     );
   }
-  if (type === "image") {
-    return <img src={url} alt={lesson.title} className="w-full rounded-xl border" loading="lazy" />;
-  }
-  if (type === "audio") {
-    return (
-      <div className="glass rounded-xl p-4">
-        <audio controls src={url} className="w-full" />
-      </div>
-    );
-  }
+  if (type === "image") return <img src={url} alt={lesson.title} className="w-full rounded-xl border" loading="lazy" />;
+  if (type === "audio") return <div className="glass rounded-xl p-4"><audio controls src={url} className="w-full" /></div>;
   const isEmbed = /youtube|youtu\.be|vimeo|loom/.test(url);
   if (isEmbed) {
     const src = url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
-    return (
-      <div className="aspect-video overflow-hidden rounded-xl border bg-black">
-        <iframe className="h-full w-full" src={src} title={lesson.title} allowFullScreen />
-      </div>
-    );
+    return <div className="aspect-video overflow-hidden rounded-xl border bg-black"><iframe className="h-full w-full" src={src} title={lesson.title} allowFullScreen /></div>;
   }
-  return (
-    <div className="overflow-hidden rounded-xl border bg-black">
-      <video controls src={url} className="aspect-video w-full" />
-    </div>
-  );
+  return <div className="overflow-hidden rounded-xl border bg-black"><video controls src={url} className="aspect-video w-full" /></div>;
 }
 
-/* ---------- Quiz ---------- */
-function QuizSection({ lessonId, onPass }: { lessonId: string; onPass: () => void }) {
+function QuizSection({ lessonId, isStaff, onPass }: { lessonId: string; isStaff: boolean; onPass: () => void }) {
+  const { user } = useSession();
   const { data: quizzes, isLoading } = useQuery({
     queryKey: ["quizzes", lessonId],
     queryFn: async () => {
       const { data } = await supabase.from("quizzes").select("*").eq("lesson_id", lessonId).order("order_index");
-      return (data ?? []) as unknown as Quiz[];
+      const list = (data ?? []) as unknown as Quiz[];
+      return isStaff ? list : list.filter((q) => q.is_published !== false);
     },
   });
   const [answers, setAnswers] = useState<Record<string, number>>({});
@@ -313,10 +336,20 @@ function QuizSection({ lessonId, onPass }: { lessonId: string; onPass: () => voi
   useEffect(() => { setAnswers({}); setSubmitted(false); }, [lessonId]);
 
   if (isLoading) return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
-  if (!quizzes?.length) return <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">No quiz for this lesson yet.</div>;
+  if (!quizzes?.length) return <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">No assessment for this lesson yet.</div>;
 
   const score = quizzes.filter((q) => answers[q.id] === q.correct_index).length;
   const passed = submitted && score === quizzes.length;
+
+  const submit = async () => {
+    setSubmitted(true);
+    if (user) {
+      await supabase.from("quiz_attempts" as never).insert({
+        user_id: user.id, lesson_id: lessonId, score, total: quizzes.length,
+        passed: score === quizzes.length, answers: answers as never,
+      } as never);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -346,16 +379,16 @@ function QuizSection({ lessonId, onPass }: { lessonId: string; onPass: () => voi
         </div>
       ))}
       {!submitted ? (
-        <Button onClick={() => setSubmitted(true)} disabled={Object.keys(answers).length !== quizzes.length} size="lg" className="bg-gradient-brand text-primary-foreground border-0">Submit answers</Button>
+        <Button onClick={submit} disabled={Object.keys(answers).length !== quizzes.length} size="lg" className="bg-gradient-brand text-primary-foreground border-0">Submit assessment</Button>
       ) : (
         <div className="flex items-center justify-between rounded-xl border bg-card p-5">
           <div className="flex items-center gap-2">
             <Trophy className={`h-6 w-6 ${passed ? "text-yellow-500" : "text-muted-foreground"}`} />
-            <span className="text-sm font-medium">{score} / {quizzes.length} correct {passed && "— perfect! 🎉"}</span>
+            <span className="text-sm font-medium">Score: {score} / {quizzes.length} {passed && "— perfect! 🎉"}</span>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => { setAnswers({}); setSubmitted(false); }}>Retry</Button>
-            {passed && <Button size="sm" onClick={onPass} className="bg-gradient-brand text-primary-foreground border-0">Mark complete</Button>}
+            {passed && <Button size="sm" onClick={onPass} className="bg-gradient-brand text-primary-foreground border-0">Mark lesson complete</Button>}
           </div>
         </div>
       )}
