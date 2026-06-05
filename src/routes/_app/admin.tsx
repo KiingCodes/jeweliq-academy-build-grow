@@ -2,9 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  Shield, Users, BookOpen, Activity, DollarSign, Loader2, Lock, Megaphone,
-  Plus, Trash2, Pencil, ChevronDown, ChevronRight, Layers, ClipboardCheck, X,
-  Award, Inbox, GripVertical, Eye, EyeOff, Download,
+  Shield, Users, BookOpen, Activity, Loader2, Lock, Megaphone,
+  Plus, Trash2, Pencil, ChevronDown, ChevronRight, Layers, ClipboardCheck,
+  Award, Inbox, GripVertical, Download, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -54,7 +54,7 @@ function AdminDashboard() {
   const { data: users } = useQuery({
     queryKey: ["admin-users"], enabled: isAdmin,
     queryFn: async () => {
-      const { data: profiles } = await supabase.from("profiles").select("id, display_name, xp, streak_days, created_at").order("created_at", { ascending: false }).limit(200);
+      const { data: profiles } = await supabase.from("profiles").select("id, display_name, avatar_url, xp, streak_days, created_at").order("created_at", { ascending: false }).limit(200);
       const { data: roles } = await supabase.from("user_roles").select("user_id, role");
       const roleMap = new Map<string, string[]>();
       roles?.forEach((r) => { const list = roleMap.get(r.user_id) ?? []; list.push(r.role); roleMap.set(r.user_id, list); });
@@ -421,7 +421,13 @@ function CertificatesPanel({ users, courses }: { users: any[]; courses: any[] })
                   <td className="p-3 text-xs">{c.courses?.title ?? "—"}</td>
                   <td className="p-3 font-mono text-xs">{c.cert_code}</td>
                   <td className="p-3 text-right">
-                    <Button size="sm" variant="ghost" onClick={() => downloadCertificate({ name: c.profiles?.display_name ?? "Student", course: c.courses?.title ?? "Course", code: c.cert_code, date: new Date(c.issued_at).toLocaleDateString() })}><Download className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" title="Preview & download" onClick={() => downloadCertificate({ name: c.profiles?.display_name ?? "Student", course: c.courses?.title ?? "Course", code: c.cert_code, date: new Date(c.issued_at).toLocaleDateString() })}><Download className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" title="Email to student" onClick={() => {
+                      const verifyUrl = `${window.location.origin}/verify/${c.cert_code}`;
+                      const subject = encodeURIComponent(`Your certificate — ${c.courses?.title ?? "JewelIQ Academy"}`);
+                      const body = encodeURIComponent(`Congratulations ${c.profiles?.display_name ?? ""}!\n\nYour certificate for "${c.courses?.title}" is ready.\n\nVerification: ${verifyUrl}\nCertificate ID: ${c.cert_code}\n\n— JewelIQ Academy`);
+                      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+                    }}><Mail className="h-3.5 w-3.5" /></Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </td>
                 </tr>
