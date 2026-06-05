@@ -2,9 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
-  Shield, Users, BookOpen, Activity, DollarSign, Loader2, Lock, Megaphone,
-  Plus, Trash2, Pencil, ChevronDown, ChevronRight, Layers, ClipboardCheck, X,
-  Award, Inbox, GripVertical, Eye, EyeOff, Download,
+  Shield, Users, BookOpen, Activity, Loader2, Lock, Megaphone,
+  Plus, Trash2, Pencil, ChevronDown, ChevronRight, Layers, ClipboardCheck,
+  Award, Inbox, GripVertical, Download, Mail,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -54,7 +54,7 @@ function AdminDashboard() {
   const { data: users } = useQuery({
     queryKey: ["admin-users"], enabled: isAdmin,
     queryFn: async () => {
-      const { data: profiles } = await supabase.from("profiles").select("id, display_name, xp, streak_days, created_at").order("created_at", { ascending: false }).limit(200);
+      const { data: profiles } = await supabase.from("profiles").select("id, display_name, avatar_url, xp, streak_days, created_at").order("created_at", { ascending: false }).limit(200);
       const { data: roles } = await supabase.from("user_roles").select("user_id, role");
       const roleMap = new Map<string, string[]>();
       roles?.forEach((r) => { const list = roleMap.get(r.user_id) ?? []; list.push(r.role); roleMap.set(r.user_id, list); });
@@ -141,6 +141,7 @@ function AdminDashboard() {
         <TabsList className="flex-wrap">
           <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="requests">Requests{(stats?.pending ?? 0) > 0 && <span className="ml-1 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">{stats?.pending}</span>}</TabsTrigger>
+          <TabsTrigger value="assessments">Assessments</TabsTrigger>
           <TabsTrigger value="certificates">Certificates</TabsTrigger>
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="enroll">Enroll</TabsTrigger>
@@ -148,9 +149,8 @@ function AdminDashboard() {
         </TabsList>
 
         <TabsContent value="content" className="mt-4"><ContentManager courses={courses ?? []} /></TabsContent>
-
         <TabsContent value="requests" className="mt-4"><RequestsPanel /></TabsContent>
-
+        <TabsContent value="assessments" className="mt-4"><AssessmentsPanel /></TabsContent>
         <TabsContent value="certificates" className="mt-4"><CertificatesPanel users={users ?? []} courses={courses ?? []} /></TabsContent>
 
         <TabsContent value="enroll" className="mt-4">
@@ -168,29 +168,7 @@ function AdminDashboard() {
           </div>
         </TabsContent>
 
-        <TabsContent value="users" className="mt-4">
-          <div className="glass overflow-x-auto rounded-2xl">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
-                <tr><th className="p-3 text-left">Name</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Streak</th><th className="p-3 text-left">Roles</th><th className="p-3 text-right">Actions</th></tr>
-              </thead>
-              <tbody>
-                {users?.map((u) => (
-                  <tr key={u.id} className="border-b last:border-0">
-                    <td className="p-3">{u.display_name ?? "—"}</td>
-                    <td className="p-3">{u.xp}</td>
-                    <td className="p-3">{u.streak_days}d</td>
-                    <td className="p-3"><span className="text-xs">{u.roles.join(", ") || "student"}</span></td>
-                    <td className="p-3 text-right">
-                      {!u.roles.includes("instructor") && <Button size="sm" variant="ghost" onClick={() => promote(u.id, "instructor")}>+ Instructor</Button>}
-                      {!u.roles.includes("admin") && <Button size="sm" variant="ghost" onClick={() => promote(u.id, "admin")}>+ Admin</Button>}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </TabsContent>
+        <TabsContent value="users" className="mt-4"><UsersPanel users={users ?? []} qc={qc} /></TabsContent>
 
         <TabsContent value="announcements" className="mt-4">
           <div className="glass space-y-3 rounded-2xl p-5">
@@ -201,6 +179,118 @@ function AdminDashboard() {
           </div>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+/* ===================== Users Panel ===================== */
+function UsersPanel({ users, qc }: { users: any[]; qc: ReturnType<typeof useQueryClient> }) {
+  const [search, setSearch] = useState("");
+  const filtered = users.filter((u) => !search || (u.display_name ?? "").toLowerCase().includes(search.toLowerCase()) || u.id.includes(search));
+
+  const promote = async (userId: string, role: "instructor" | "admin") => {
+    const { error } = await supabase.from("user_roles").insert({ user_id: userId, role });
+    if (error) return toast.error(error.message);
+    toast.success(`Granted ${role}`);
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+  };
+  const demote = async (userId: string, role: "instructor" | "admin") => {
+    if (!confirm(`Remove ${role} role from this user?`)) return;
+    const { error } = await supabase.from("user_roles").delete().eq("user_id", userId).eq("role", role);
+    if (error) return toast.error(error.message);
+    toast.success(`Removed ${role}`);
+    qc.invalidateQueries({ queryKey: ["admin-users"] });
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Input placeholder="Search users by name or ID…" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-md" />
+        <span className="text-xs text-muted-foreground">{filtered.length} of {users.length}</span>
+      </div>
+      <div className="glass overflow-x-auto rounded-2xl">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+            <tr><th className="p-3 text-left">User</th><th className="p-3 text-left">XP</th><th className="p-3 text-left">Streak</th><th className="p-3 text-left">Joined</th><th className="p-3 text-left">Roles</th><th className="p-3 text-right">Actions</th></tr>
+          </thead>
+          <tbody>
+            {filtered.map((u) => {
+              const initial = (u.display_name ?? "U")[0].toUpperCase();
+              return (
+                <tr key={u.id} className="border-b last:border-0">
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <div className="bg-gradient-brand flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[10px] font-semibold text-primary-foreground">
+                        {u.avatar_url ? <img src={u.avatar_url} alt="" className="h-full w-full object-cover" /> : initial}
+                      </div>
+                      <div>
+                        <div className="font-medium">{u.display_name ?? "—"}</div>
+                        <div className="font-mono text-[10px] text-muted-foreground">{u.id.slice(0, 8)}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-3">{u.xp}</td>
+                  <td className="p-3">{u.streak_days}d</td>
+                  <td className="p-3 text-xs text-muted-foreground">{u.created_at ? new Date(u.created_at).toLocaleDateString() : "—"}</td>
+                  <td className="p-3"><div className="flex flex-wrap gap-1">{(u.roles.length ? u.roles : ["student"]).map((r: string) => <Badge key={r} variant={r === "admin" ? "default" : "secondary"} className="text-[10px] capitalize">{r}</Badge>)}</div></td>
+                  <td className="p-3 text-right">
+                    {!u.roles.includes("instructor") ? <Button size="sm" variant="ghost" onClick={() => promote(u.id, "instructor")}>+ Instr</Button> : <Button size="sm" variant="ghost" onClick={() => demote(u.id, "instructor")}>− Instr</Button>}
+                    {!u.roles.includes("admin") ? <Button size="sm" variant="ghost" onClick={() => promote(u.id, "admin")}>+ Admin</Button> : <Button size="sm" variant="ghost" onClick={() => demote(u.id, "admin")}>− Admin</Button>}
+                  </td>
+                </tr>
+              );
+            })}
+            {!filtered.length && <tr><td className="p-6 text-center text-muted-foreground" colSpan={6}>No users found.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ===================== Assessments Panel ===================== */
+function AssessmentsPanel() {
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin-attempts"],
+    queryFn: async () => {
+      const { data } = await supabase.from("quiz_attempts" as never)
+        .select("id, score, total, passed, created_at, user_id, lesson_id, profiles:user_id(display_name, avatar_url), lessons(title, courses(title))")
+        .order("created_at", { ascending: false }).limit(200);
+      return (data ?? []) as any[];
+    },
+  });
+  if (isLoading) return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
+  if (!data?.length) return <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">No assessment attempts yet.</div>;
+
+  const passed = data.filter((d) => d.passed).length;
+  const avg = Math.round(data.reduce((a, d) => a + (d.total ? d.score / d.total : 0), 0) / data.length * 100);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="glass rounded-2xl p-4"><p className="text-xs text-muted-foreground">Total attempts</p><p className="font-display text-2xl font-semibold">{data.length}</p></div>
+        <div className="glass rounded-2xl p-4"><p className="text-xs text-muted-foreground">Passed</p><p className="font-display text-2xl font-semibold">{passed}</p></div>
+        <div className="glass rounded-2xl p-4"><p className="text-xs text-muted-foreground">Average score</p><p className="font-display text-2xl font-semibold">{avg}%</p></div>
+      </div>
+      <div className="glass overflow-x-auto rounded-2xl">
+        <table className="w-full text-sm">
+          <thead className="border-b bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
+            <tr><th className="p-3 text-left">When</th><th className="p-3 text-left">Student</th><th className="p-3 text-left">Lesson</th><th className="p-3 text-left">Course</th><th className="p-3 text-left">Score</th><th className="p-3 text-left">Status</th></tr>
+          </thead>
+          <tbody>
+            {data.map((a) => (
+              <tr key={a.id} className="border-b last:border-0">
+                <td className="p-3 text-xs text-muted-foreground">{new Date(a.created_at).toLocaleString()}</td>
+                <td className="p-3">{a.profiles?.display_name ?? a.user_id?.slice(0, 8)}</td>
+                <td className="p-3 text-xs">{a.lessons?.title ?? "—"}</td>
+                <td className="p-3 text-xs text-muted-foreground">{a.lessons?.courses?.title ?? "—"}</td>
+                <td className="p-3 font-mono">{a.score}/{a.total} <span className="text-xs text-muted-foreground">({a.total ? Math.round(a.score / a.total * 100) : 0}%)</span></td>
+                <td className="p-3"><Badge variant={a.passed ? "default" : "outline"}>{a.passed ? "Passed" : "Failed"}</Badge></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -331,7 +421,13 @@ function CertificatesPanel({ users, courses }: { users: any[]; courses: any[] })
                   <td className="p-3 text-xs">{c.courses?.title ?? "—"}</td>
                   <td className="p-3 font-mono text-xs">{c.cert_code}</td>
                   <td className="p-3 text-right">
-                    <Button size="sm" variant="ghost" onClick={() => downloadCertificate({ name: c.profiles?.display_name ?? "Student", course: c.courses?.title ?? "Course", code: c.cert_code, date: new Date(c.issued_at).toLocaleDateString() })}><Download className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" title="Preview & download" onClick={() => downloadCertificate({ name: c.profiles?.display_name ?? "Student", course: c.courses?.title ?? "Course", code: c.cert_code, date: new Date(c.issued_at).toLocaleDateString() })}><Download className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" title="Email to student" onClick={() => {
+                      const verifyUrl = `${window.location.origin}/verify/${c.cert_code}`;
+                      const subject = encodeURIComponent(`Your certificate — ${c.courses?.title ?? "JewelIQ Academy"}`);
+                      const body = encodeURIComponent(`Congratulations ${c.profiles?.display_name ?? ""}!\n\nYour certificate for "${c.courses?.title}" is ready.\n\nVerification: ${verifyUrl}\nCertificate ID: ${c.cert_code}\n\n— JewelIQ Academy`);
+                      window.location.href = `mailto:?subject=${subject}&body=${body}`;
+                    }}><Mail className="h-3.5 w-3.5" /></Button>
                     <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => remove(c.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                   </td>
                 </tr>
