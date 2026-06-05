@@ -17,6 +17,7 @@ import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VerifyCodeRouteImport } from './routes/verify.$code'
 import { Route as AppTutorRouteImport } from './routes/_app/tutor'
+import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as AppPlaygroundRouteImport } from './routes/_app/playground'
 import { Route as AppInstructorRouteImport } from './routes/_app/instructor'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
@@ -63,6 +64,11 @@ const VerifyCodeRoute = VerifyCodeRouteImport.update({
 const AppTutorRoute = AppTutorRouteImport.update({
   id: '/tutor',
   path: '/tutor',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProfileRoute = AppProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
 const AppPlaygroundRoute = AppPlaygroundRouteImport.update({
@@ -118,6 +124,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AppDashboardRoute
   '/instructor': typeof AppInstructorRoute
   '/playground': typeof AppPlaygroundRoute
+  '/profile': typeof AppProfileRoute
   '/tutor': typeof AppTutorRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/courses/$slug': typeof AppCoursesSlugRoute
@@ -135,6 +142,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AppDashboardRoute
   '/instructor': typeof AppInstructorRoute
   '/playground': typeof AppPlaygroundRoute
+  '/profile': typeof AppProfileRoute
   '/tutor': typeof AppTutorRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/courses/$slug': typeof AppCoursesSlugRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/_app/dashboard': typeof AppDashboardRoute
   '/_app/instructor': typeof AppInstructorRoute
   '/_app/playground': typeof AppPlaygroundRoute
+  '/_app/profile': typeof AppProfileRoute
   '/_app/tutor': typeof AppTutorRoute
   '/verify/$code': typeof VerifyCodeRoute
   '/_app/courses/$slug': typeof AppCoursesSlugRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/instructor'
     | '/playground'
+    | '/profile'
     | '/tutor'
     | '/verify/$code'
     | '/courses/$slug'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/instructor'
     | '/playground'
+    | '/profile'
     | '/tutor'
     | '/verify/$code'
     | '/courses/$slug'
@@ -208,6 +219,7 @@ export interface FileRouteTypes {
     | '/_app/dashboard'
     | '/_app/instructor'
     | '/_app/playground'
+    | '/_app/profile'
     | '/_app/tutor'
     | '/verify/$code'
     | '/_app/courses/$slug'
@@ -282,6 +294,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppTutorRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/profile': {
+      id: '/_app/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AppProfileRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/playground': {
       id: '/_app/playground'
       path: '/playground'
@@ -348,6 +367,7 @@ interface AppRouteChildren {
   AppDashboardRoute: typeof AppDashboardRoute
   AppInstructorRoute: typeof AppInstructorRoute
   AppPlaygroundRoute: typeof AppPlaygroundRoute
+  AppProfileRoute: typeof AppProfileRoute
   AppTutorRoute: typeof AppTutorRoute
   AppCoursesSlugRoute: typeof AppCoursesSlugRoute
   AppCoursesIndexRoute: typeof AppCoursesIndexRoute
@@ -360,6 +380,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppDashboardRoute: AppDashboardRoute,
   AppInstructorRoute: AppInstructorRoute,
   AppPlaygroundRoute: AppPlaygroundRoute,
+  AppProfileRoute: AppProfileRoute,
   AppTutorRoute: AppTutorRoute,
   AppCoursesSlugRoute: AppCoursesSlugRoute,
   AppCoursesIndexRoute: AppCoursesIndexRoute,
@@ -379,3 +400,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
