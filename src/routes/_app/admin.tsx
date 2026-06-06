@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   Shield, Users, BookOpen, Activity, Loader2, Lock, Megaphone,
   Plus, Trash2, Pencil, ChevronDown, ChevronRight, Layers, ClipboardCheck,
-  Award, Inbox, GripVertical, Download, Mail,
+  Award, Inbox, GripVertical, Download, Mail, Eye, EyeOff, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
