@@ -178,27 +178,25 @@ function CourseDetail() {
               <h1 className="font-display mt-3 text-3xl font-semibold tracking-tight">{active.title}</h1>
 
               <Tabs value={tab} onValueChange={setTab} className="mt-5">
-                <TabsList className="grid w-full grid-cols-4 sm:w-auto sm:inline-flex">
-                  <TabsTrigger value="read"><BookOpen className="mr-1 h-3.5 w-3.5" />Read</TabsTrigger>
-                  <TabsTrigger value="code"><Code2 className="mr-1 h-3.5 w-3.5" />Code</TabsTrigger>
+                <TabsList className={`grid w-full ${active.lesson_type === "code" ? "grid-cols-4" : "grid-cols-3"} sm:w-auto sm:inline-flex`}>
+                  <TabsTrigger value="read"><BookOpen className="mr-1 h-3.5 w-3.5" />Lesson</TabsTrigger>
+                  {active.lesson_type === "code" && (
+                    <TabsTrigger value="code"><Code2 className="mr-1 h-3.5 w-3.5" />Practice</TabsTrigger>
+                  )}
                   <TabsTrigger value="quiz"><HelpCircle className="mr-1 h-3.5 w-3.5" />Quiz</TabsTrigger>
                   <TabsTrigger value="notes">Notes</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="read" className="mt-5 space-y-5">
-                  {active.video_url && (
-                    <div className="aspect-video overflow-hidden rounded-xl border bg-black">
-                      <iframe className="h-full w-full" src={active.video_url} title={active.title} allowFullScreen />
+                  <LessonMedia lesson={active} />
+                  {active.content && (
+                    <div className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
+                      {active.content}
                     </div>
                   )}
-                  {!active.video_url && (
-                    <div className="bg-gradient-hero flex aspect-video items-center justify-center rounded-xl text-white/80">
-                      <PlayCircle className="h-12 w-12" />
-                    </div>
+                  {!active.content && !active.video_url && (
+                    <p className="text-sm text-muted-foreground">Lesson content coming soon.</p>
                   )}
-                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-foreground/90">
-                    {active.content ?? "Lesson content coming soon."}
-                  </p>
                   {enrollment && (
                     <Button onClick={toggleComplete} variant={completedIds.has(active.id) ? "outline" : "default"} className={completedIds.has(active.id) ? "" : "bg-gradient-brand text-primary-foreground border-0"}>
                       {completedIds.has(active.id) ? "Completed ✓" : "Mark as complete  +25 XP"}
@@ -206,9 +204,11 @@ function CourseDetail() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="code" className="mt-5">
-                  <CodePlayground lesson={active} />
-                </TabsContent>
+                {active.lesson_type === "code" && (
+                  <TabsContent value="code" className="mt-5">
+                    <CodePlayground lesson={active} />
+                  </TabsContent>
+                )}
 
                 <TabsContent value="quiz" className="mt-5">
                   <QuizSection lessonId={active.id} onPass={toggleComplete} />
@@ -231,7 +231,44 @@ function CourseDetail() {
   );
 }
 
-/* ---------- Code playground ---------- */
+/* ---------- Lesson media (image / audio / video) ---------- */
+function LessonMedia({ lesson }: { lesson: Lesson }) {
+  const url = lesson.video_url;
+  const type = lesson.lesson_type ?? "reading";
+  if (!url) {
+    if (type === "reading") return null;
+    return (
+      <div className="bg-gradient-hero flex aspect-video items-center justify-center rounded-xl text-white/80">
+        <PlayCircle className="h-12 w-12" />
+      </div>
+    );
+  }
+  if (type === "image") {
+    return <img src={url} alt={lesson.title} className="w-full rounded-xl border" loading="lazy" />;
+  }
+  if (type === "audio") {
+    return (
+      <div className="glass rounded-xl p-4">
+        <audio controls src={url} className="w-full" />
+      </div>
+    );
+  }
+  // video — embed iframe for youtube/vimeo style, native video for direct files
+  const isEmbed = /youtube|youtu\.be|vimeo|loom/.test(url);
+  if (isEmbed) {
+    const src = url.replace("watch?v=", "embed/").replace("youtu.be/", "youtube.com/embed/");
+    return (
+      <div className="aspect-video overflow-hidden rounded-xl border bg-black">
+        <iframe className="h-full w-full" src={src} title={lesson.title} allowFullScreen />
+      </div>
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-xl border bg-black">
+      <video controls src={url} className="aspect-video w-full" />
+    </div>
+  );
+}
 function CodePlayground({ lesson }: { lesson: Lesson }) {
   const lang = lesson.code_language ?? "javascript";
   const initial = lesson.starter_code ?? `// Try writing some ${lang} code\nconsole.log("Hello from JewelIQ");`;

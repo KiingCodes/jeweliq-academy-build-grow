@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { Loader2, LayoutDashboard, BookOpen, Code2, Bot, LogOut, Shield, GraduationCap, Award, Users, AlertCircle } from "lucide-react";
+import { Loader2, LayoutDashboard, BookOpen, Bot, LogOut, Shield, GraduationCap, Award, Users, AlertCircle } from "lucide-react";
 import { useSession } from "@/hooks/use-session";
 import { useRoles } from "@/hooks/use-roles";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,8 +13,7 @@ export const Route = createFileRoute("/_app")({
 const baseNav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/courses", label: "Courses", icon: BookOpen },
-  { to: "/playground", label: "Playground", icon: Code2 },
-  { to: "/tutor", label: "AI Tutor", icon: Bot },
+  { to: "/tutor", label: "AI Coach", icon: Bot },
   { to: "/community", label: "Community", icon: Users },
   { to: "/certificates", label: "Certificates", icon: Award },
 ] as const;
