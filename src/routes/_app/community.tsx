@@ -1,7 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { MessageCircle, Heart, Send, Megaphone, Loader2, Plus, Users as UsersIcon, MessageSquare, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { MessageCircle, Heart, Send, Megaphone, Loader2, Plus, Users as UsersIcon, MessageSquare, Sparkles, Search, TrendingUp, Clock, Award as AwardIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
@@ -22,6 +22,8 @@ function CommunityPage() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"recent" | "trending">("recent");
 
   const { data: announcements } = useQuery({
     queryKey: ["announcements"],
@@ -38,6 +40,32 @@ function CommunityPage() {
       return (data ?? []) as Array<{ id: string; title: string; body: string; created_at: string; user_id: string; profiles: { display_name: string; avatar_url: string | null } | null; comments: { count: number }[]; reactions: { count: number }[] }>;
     },
   });
+
+  // Realtime: refresh on any new discussion/comment/reaction
+  useEffect(() => {
+    const ch = supabase.channel("community-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "discussions" }, () => qc.invalidateQueries({ queryKey: ["discussions"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, () => qc.invalidateQueries({ queryKey: ["discussions"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "reactions" }, () => qc.invalidateQueries({ queryKey: ["discussions"] }))
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
+
+  const filtered = useMemo(() => {
+    let list = posts ?? [];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((p) => p.title.toLowerCase().includes(q) || (p.body ?? "").toLowerCase().includes(q));
+    }
+    if (sort === "trending") {
+      list = [...list].sort((a, b) => {
+        const aS = (a.reactions?.[0]?.count ?? 0) * 2 + (a.comments?.[0]?.count ?? 0);
+        const bS = (b.reactions?.[0]?.count ?? 0) * 2 + (b.comments?.[0]?.count ?? 0);
+        return bS - aS;
+      });
+    }
+    return list;
+  }, [posts, search, sort]);
 
   const submit = async () => {
     if (!user || !title.trim()) return;
@@ -103,10 +131,22 @@ function CommunityPage() {
             </div>
           )}
 
-          {isLoading ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> : posts?.length ? (
-            posts.map((p) => <PostCard key={p.id} post={p} />)
+          <div className="glass flex flex-wrap items-center gap-2 rounded-2xl p-3">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search discussions…" className="pl-8" />
+            </div>
+            <div className="flex gap-1">
+              <Button size="sm" variant={sort === "recent" ? "default" : "outline"} onClick={() => setSort("recent")}><Clock className="mr-1 h-3.5 w-3.5" />Recent</Button>
+              <Button size="sm" variant={sort === "trending" ? "default" : "outline"} onClick={() => setSort("trending")}><TrendingUp className="mr-1 h-3.5 w-3.5" />Trending</Button>
+            </div>
+            <Badge variant="outline" className="ml-auto">{filtered.length} posts</Badge>
+          </div>
+
+          {isLoading ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> : filtered.length ? (
+            filtered.map((p) => <PostCard key={p.id} post={p} />)
           ) : (
-            <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">Be the first to start a discussion.</div>
+            <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">{search ? "No posts match your search." : "Be the first to start a discussion."}</div>
           )}
         </TabsContent>
 
@@ -209,27 +249,39 @@ function MembersDirectory() {
   if (!members?.length) return <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">No enrolled members yet.</div>;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {members.map((m) => {
-        const initial = (m.display_name ?? "U")[0].toUpperCase();
-        return (
-          <div key={m.id} className="glass rounded-2xl p-5 transition hover:shadow-glow">
-            <div className="flex items-start gap-3">
-              <div className="bg-gradient-brand flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-lg font-semibold text-primary-foreground">
-                {m.avatar_url ? <img src={m.avatar_url} alt="" className="h-full w-full object-cover" /> : initial}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="font-display truncate text-base font-semibold">{m.display_name ?? "Member"}</h3>
-                <div className="mt-1 flex flex-wrap gap-1.5">
-                  <Badge variant="outline" className="gap-1 text-[10px]"><Sparkles className="h-2.5 w-2.5" />{m.xp ?? 0} XP</Badge>
-                  <Badge variant="outline" className="text-[10px]">🔥 {m.streak_days ?? 0}d</Badge>
+    <div className="space-y-4">
+      <div className="glass flex items-center justify-between rounded-2xl p-4">
+        <div className="flex items-center gap-2 text-sm">
+          <UsersIcon className="h-4 w-4 text-primary" />
+          <span className="font-medium">{members.length} enrolled founders</span>
+        </div>
+        <Badge variant="outline" className="gap-1"><AwardIcon className="h-3 w-3" />Sorted by XP</Badge>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {members.map((m, i) => {
+          const initial = (m.display_name ?? "U")[0].toUpperCase();
+          return (
+            <div key={m.id} className="glass relative rounded-2xl p-5 transition hover:shadow-glow">
+              {i < 3 && (
+                <Badge className="absolute -right-2 -top-2 bg-gradient-brand border-0 text-primary-foreground">#{i + 1}</Badge>
+              )}
+              <div className="flex items-start gap-3">
+                <div className="bg-gradient-brand flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-lg font-semibold text-primary-foreground">
+                  {m.avatar_url ? <img src={m.avatar_url} alt="" className="h-full w-full object-cover" /> : initial}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-display truncate text-base font-semibold">{m.display_name ?? "Member"}</h3>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className="gap-1 text-[10px]"><Sparkles className="h-2.5 w-2.5" />{m.xp ?? 0} XP</Badge>
+                    <Badge variant="outline" className="text-[10px]">🔥 {m.streak_days ?? 0}d</Badge>
+                  </div>
                 </div>
               </div>
+              {m.bio && <p className="mt-3 line-clamp-3 text-xs text-muted-foreground">{m.bio}</p>}
             </div>
-            {m.bio && <p className="mt-3 line-clamp-3 text-xs text-muted-foreground">{m.bio}</p>}
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
