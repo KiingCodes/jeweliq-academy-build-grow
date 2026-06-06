@@ -240,6 +240,39 @@ export type Database = {
         }
         Relationships: []
       }
+      enrollment_requests: {
+        Row: {
+          course_id: string | null
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+          message: string | null
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          course_id?: string | null
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id?: string
+          message?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          course_id?: string | null
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+          message?: string | null
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       enrollments: {
         Row: {
           course_id: string
@@ -346,6 +379,7 @@ export type Database = {
           duration_minutes: number | null
           id: string
           lesson_type: string
+          module_id: string | null
           order_index: number
           starter_code: string | null
           title: string
@@ -360,6 +394,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           lesson_type?: string
+          module_id?: string | null
           order_index?: number
           starter_code?: string | null
           title: string
@@ -374,6 +409,7 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           lesson_type?: string
+          module_id?: string | null
           order_index?: number
           starter_code?: string | null
           title?: string
@@ -382,6 +418,48 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "lessons_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lessons_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modules: {
+        Row: {
+          course_id: string
+          created_at: string
+          description: string | null
+          id: string
+          order_index: number
+          title: string
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          title: string
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_index?: number
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modules_course_id_fkey"
             columns: ["course_id"]
             isOneToOne: false
             referencedRelation: "courses"
@@ -422,12 +500,46 @@ export type Database = {
         }
         Relationships: []
       }
+      quiz_attempts: {
+        Row: {
+          answers: Json | null
+          created_at: string
+          id: string
+          lesson_id: string
+          passed: boolean
+          score: number
+          total: number
+          user_id: string
+        }
+        Insert: {
+          answers?: Json | null
+          created_at?: string
+          id?: string
+          lesson_id: string
+          passed?: boolean
+          score?: number
+          total?: number
+          user_id: string
+        }
+        Update: {
+          answers?: Json | null
+          created_at?: string
+          id?: string
+          lesson_id?: string
+          passed?: boolean
+          score?: number
+          total?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       quizzes: {
         Row: {
           correct_index: number
           created_at: string
           explanation: string | null
           id: string
+          is_published: boolean
           lesson_id: string
           options: Json
           order_index: number
@@ -438,6 +550,7 @@ export type Database = {
           created_at?: string
           explanation?: string | null
           id?: string
+          is_published?: boolean
           lesson_id: string
           options: Json
           order_index?: number
@@ -448,6 +561,7 @@ export type Database = {
           created_at?: string
           explanation?: string | null
           id?: string
+          is_published?: boolean
           lesson_id?: string
           options?: Json
           order_index?: number

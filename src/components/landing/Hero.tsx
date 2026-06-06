@@ -1,10 +1,10 @@
-import { ArrowRight, Sparkles } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden pt-16 pb-24 sm:pt-24 sm:pb-32">
+    <section className="relative overflow-hidden pt-20 pb-28 sm:pt-28 sm:pb-36">
       <div
         aria-hidden
         className="absolute inset-0 -z-10 opacity-70"
@@ -21,8 +21,13 @@ export function Hero() {
           </div>
 
           <h1
-            style={{ fontFamily: "var(--font-hero)" }}
-            className="text-5xl font-light leading-[1.05] tracking-tight sm:text-7xl lg:text-[5.5rem]"
+            style={{
+              fontFamily: "var(--font-hero)",
+              fontWeight: 800,
+              fontVariationSettings: '"opsz" 96',
+              letterSpacing: "-0.04em",
+            }}
+            className="text-6xl leading-[0.95] sm:text-7xl lg:text-[6.5rem]"
           >
             Build your{" "}
             <em
@@ -36,7 +41,14 @@ export function Hero() {
           <p className="mx-auto mt-7 max-w-xl text-base text-muted-foreground sm:text-lg">
             JewelIQ Academy is the premium platform for digital entrepreneurs. Master the mindset,
             marketing, and money systems behind every successful online business — with expert
-            lessons, an AI coach, and a community of doers.
+            lessons, an AI coach, and a community of doers. Build your
+            <br className="hidden sm:block" />
+            <span className="text-gradient">online empire.</span>
+          </p>
+
+          <p className="mx-auto mt-7 max-w-xl text-base text-muted-foreground sm:text-lg">
+            JewelIQ Academy is where digital entrepreneurs learn the mindset, marketing, and money
+            systems behind successful online businesses.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Button
@@ -45,16 +57,16 @@ export function Hero() {
               className="bg-gradient-brand group rounded-xl border-0 text-primary-foreground shadow-glow"
             >
               <Link to="/signup">
-                Start free today
+                Request enrollment
                 <ArrowRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="rounded-xl">
-              <Link to="/courses">Browse courses</Link>
+              <Link to="/login">Sign in</Link>
             </Button>
           </div>
           <p className="mt-4 text-xs text-muted-foreground">
-            No credit card · Cancel anytime · Lifetime updates
+            Enrollment-based access · Cohort programs
           </p>
         </div>
 

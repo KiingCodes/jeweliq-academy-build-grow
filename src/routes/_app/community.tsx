@@ -1,17 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
-import { MessageCircle, Heart, Send, Megaphone, Loader2, Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { MessageCircle, Heart, Send, Megaphone, Loader2, Plus, Users as UsersIcon, MessageSquare, Sparkles, Search, TrendingUp, Clock, Award as AwardIcon } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useSession } from "@/hooks/use-session";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 
 export const Route = createFileRoute("/_app/community")({
   component: CommunityPage,
-  head: () => ({ meta: [{ title: "Community — JewelIQ Academy" }] }),
+  head: () => ({ meta: [{ title: "Student Discussions — JewelIQ Academy" }] }),
 });
 
 function CommunityPage() {
@@ -20,6 +22,8 @@ function CommunityPage() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [search, setSearch] = useState("");
+  const [sort, setSort] = useState<"recent" | "trending">("recent");
 
   const { data: announcements } = useQuery({
     queryKey: ["announcements"],
@@ -37,6 +41,32 @@ function CommunityPage() {
     },
   });
 
+  // Realtime: refresh on any new discussion/comment/reaction
+  useEffect(() => {
+    const ch = supabase.channel("community-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "discussions" }, () => qc.invalidateQueries({ queryKey: ["discussions"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "comments" }, () => qc.invalidateQueries({ queryKey: ["discussions"] }))
+      .on("postgres_changes", { event: "*", schema: "public", table: "reactions" }, () => qc.invalidateQueries({ queryKey: ["discussions"] }))
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
+
+  const filtered = useMemo(() => {
+    let list = posts ?? [];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((p) => p.title.toLowerCase().includes(q) || (p.body ?? "").toLowerCase().includes(q));
+    }
+    if (sort === "trending") {
+      list = [...list].sort((a, b) => {
+        const aS = (a.reactions?.[0]?.count ?? 0) * 2 + (a.comments?.[0]?.count ?? 0);
+        const bS = (b.reactions?.[0]?.count ?? 0) * 2 + (b.comments?.[0]?.count ?? 0);
+        return bS - aS;
+      });
+    }
+    return list;
+  }, [posts, search, sort]);
+
   const submit = async () => {
     if (!user || !title.trim()) return;
     const { error } = await supabase.from("discussions" as never).insert([{ user_id: user.id, title, body }] as any);
@@ -48,21 +78,24 @@ function CommunityPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-muted-foreground">Community</p>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">Developer feed</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Ask questions, share wins, help fellow learners.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline">
-            <a href="https://chat.whatsapp.com/" target="_blank" rel="noreferrer">
-              <MessageCircle className="mr-1 h-4 w-4" /> WhatsApp group
-            </a>
-          </Button>
-          <Button onClick={() => setOpen((o) => !o)} className="bg-gradient-brand text-primary-foreground border-0">
-            <Plus className="mr-1 h-4 w-4" /> New post
-          </Button>
+      <div className="glass relative overflow-hidden rounded-3xl p-6 sm:p-8">
+        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-gradient-brand opacity-20 blur-3xl" />
+        <div className="relative flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Community</p>
+            <h1 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Student discussions</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Connect with fellow founders, share wins, ask questions.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline">
+              <a href="https://chat.whatsapp.com/" target="_blank" rel="noreferrer">
+                <MessageCircle className="mr-1 h-4 w-4" /> WhatsApp
+              </a>
+            </Button>
+            <Button onClick={() => setOpen((o) => !o)} className="bg-gradient-brand text-primary-foreground border-0">
+              <Plus className="mr-1 h-4 w-4" /> New post
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -80,29 +113,52 @@ function CommunityPage() {
         </div>
       )}
 
-      {open && (
-        <div className="glass space-y-3 rounded-2xl p-5">
-          <Input placeholder="Post title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <Textarea placeholder="Share details, code, questions…" value={body} onChange={(e) => setBody(e.target.value)} rows={4} />
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button onClick={submit} className="bg-gradient-brand text-primary-foreground border-0"><Send className="mr-1 h-4 w-4" />Post</Button>
-          </div>
-        </div>
-      )}
+      <Tabs defaultValue="discussions">
+        <TabsList>
+          <TabsTrigger value="discussions"><MessageSquare className="mr-1 h-3.5 w-3.5" />Discussions</TabsTrigger>
+          <TabsTrigger value="members"><UsersIcon className="mr-1 h-3.5 w-3.5" />Members</TabsTrigger>
+        </TabsList>
 
-      {isLoading ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> : (
-        <div className="space-y-3">
-          {posts?.length ? posts.map((p) => <PostCard key={p.id} post={p} />) : (
-            <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">Be the first to start a discussion.</div>
+        <TabsContent value="discussions" className="mt-4 space-y-3">
+          {open && (
+            <div className="glass space-y-3 rounded-2xl p-5">
+              <Input placeholder="Post title" value={title} onChange={(e) => setTitle(e.target.value)} />
+              <Textarea placeholder="Share details, questions, wins…" value={body} onChange={(e) => setBody(e.target.value)} rows={4} />
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
+                <Button onClick={submit} className="bg-gradient-brand text-primary-foreground border-0"><Send className="mr-1 h-4 w-4" />Post</Button>
+              </div>
+            </div>
           )}
-        </div>
-      )}
+
+          <div className="glass flex flex-wrap items-center gap-2 rounded-2xl p-3">
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search discussions…" className="pl-8" />
+            </div>
+            <div className="flex gap-1">
+              <Button size="sm" variant={sort === "recent" ? "default" : "outline"} onClick={() => setSort("recent")}><Clock className="mr-1 h-3.5 w-3.5" />Recent</Button>
+              <Button size="sm" variant={sort === "trending" ? "default" : "outline"} onClick={() => setSort("trending")}><TrendingUp className="mr-1 h-3.5 w-3.5" />Trending</Button>
+            </div>
+            <Badge variant="outline" className="ml-auto">{filtered.length} posts</Badge>
+          </div>
+
+          {isLoading ? <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /> : filtered.length ? (
+            filtered.map((p) => <PostCard key={p.id} post={p} />)
+          ) : (
+            <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">{search ? "No posts match your search." : "Be the first to start a discussion."}</div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="members" className="mt-4">
+          <MembersDirectory />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
 
-function PostCard({ post }: { post: { id: string; title: string; body: string; created_at: string; profiles: { display_name: string } | null; comments: { count: number }[]; reactions: { count: number }[] } }) {
+function PostCard({ post }: { post: { id: string; title: string; body: string; created_at: string; profiles: { display_name: string; avatar_url: string | null } | null; comments: { count: number }[]; reactions: { count: number }[] } }) {
   const { user } = useSession();
   const qc = useQueryClient();
   const [showComments, setShowComments] = useState(false);
@@ -114,10 +170,10 @@ function PostCard({ post }: { post: { id: string; title: string; body: string; c
     queryFn: async () => {
       const { data } = await supabase
         .from("comments" as never)
-        .select("id, body, created_at, profiles:user_id(display_name)")
+        .select("id, body, created_at, profiles:user_id(display_name, avatar_url)")
         .eq("discussion_id", post.id)
         .order("created_at");
-      return (data ?? []) as Array<{ id: string; body: string; created_at: string; profiles: { display_name: string } | null }>;
+      return (data ?? []) as Array<{ id: string; body: string; created_at: string; profiles: { display_name: string; avatar_url: string | null } | null }>;
     },
   });
 
@@ -135,13 +191,17 @@ function PostCard({ post }: { post: { id: string; title: string; body: string; c
     qc.invalidateQueries({ queryKey: ["discussions"] });
   };
 
+  const avatar = post.profiles?.avatar_url;
+  const initial = (post.profiles?.display_name?.[0] ?? "U").toUpperCase();
+
   return (
-    <article className="glass rounded-2xl p-5">
+    <article className="glass rounded-2xl p-5 transition hover:shadow-glow">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <div className="bg-gradient-brand flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold text-primary-foreground">
-          {(post.profiles?.display_name?.[0] ?? "U").toUpperCase()}
+        <div className="bg-gradient-brand flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[10px] font-semibold text-primary-foreground">
+          {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : initial}
         </div>
-        <span>{post.profiles?.display_name ?? "Member"} · {new Date(post.created_at).toLocaleDateString()}</span>
+        <span className="font-medium text-foreground">{post.profiles?.display_name ?? "Member"}</span>
+        <span>· {new Date(post.created_at).toLocaleDateString()}</span>
       </div>
       <h3 className="font-display mt-2 text-lg font-semibold">{post.title}</h3>
       {post.body && <p className="mt-1 whitespace-pre-wrap text-sm text-foreground/80">{post.body}</p>}
@@ -152,9 +212,14 @@ function PostCard({ post }: { post: { id: string; title: string; body: string; c
       {showComments && (
         <div className="mt-3 space-y-2 border-t pt-3">
           {comments?.map((c) => (
-            <div key={c.id} className="rounded-lg bg-background/60 p-2 text-sm">
-              <p className="text-xs font-medium text-muted-foreground">{c.profiles?.display_name ?? "Member"}</p>
-              <p>{c.body}</p>
+            <div key={c.id} className="flex gap-2 rounded-lg bg-background/60 p-2 text-sm">
+              <div className="bg-gradient-brand mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full text-[10px] font-semibold text-primary-foreground">
+                {c.profiles?.avatar_url ? <img src={c.profiles.avatar_url} alt="" className="h-full w-full object-cover" /> : (c.profiles?.display_name?.[0] ?? "U").toUpperCase()}
+              </div>
+              <div>
+                <p className="text-xs font-medium">{c.profiles?.display_name ?? "Member"}</p>
+                <p>{c.body}</p>
+              </div>
             </div>
           ))}
           <div className="flex gap-2">
@@ -164,5 +229,59 @@ function PostCard({ post }: { post: { id: string; title: string; body: string; c
         </div>
       )}
     </article>
+  );
+}
+
+function MembersDirectory() {
+  const { data: members, isLoading } = useQuery({
+    queryKey: ["community-members"],
+    queryFn: async () => {
+      // get distinct enrolled user ids
+      const { data: enrolls } = await supabase.from("enrollments").select("user_id");
+      const ids = Array.from(new Set((enrolls ?? []).map((e: any) => e.user_id)));
+      if (!ids.length) return [];
+      const { data: profiles } = await supabase.from("profiles").select("id, display_name, avatar_url, bio, xp, streak_days").in("id", ids);
+      return (profiles ?? []).sort((a, b) => (b.xp ?? 0) - (a.xp ?? 0));
+    },
+  });
+
+  if (isLoading) return <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />;
+  if (!members?.length) return <div className="glass rounded-2xl p-10 text-center text-sm text-muted-foreground">No enrolled members yet.</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="glass flex items-center justify-between rounded-2xl p-4">
+        <div className="flex items-center gap-2 text-sm">
+          <UsersIcon className="h-4 w-4 text-primary" />
+          <span className="font-medium">{members.length} enrolled founders</span>
+        </div>
+        <Badge variant="outline" className="gap-1"><AwardIcon className="h-3 w-3" />Sorted by XP</Badge>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {members.map((m, i) => {
+          const initial = (m.display_name ?? "U")[0].toUpperCase();
+          return (
+            <div key={m.id} className="glass relative rounded-2xl p-5 transition hover:shadow-glow">
+              {i < 3 && (
+                <Badge className="absolute -right-2 -top-2 bg-gradient-brand border-0 text-primary-foreground">#{i + 1}</Badge>
+              )}
+              <div className="flex items-start gap-3">
+                <div className="bg-gradient-brand flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-lg font-semibold text-primary-foreground">
+                  {m.avatar_url ? <img src={m.avatar_url} alt="" className="h-full w-full object-cover" /> : initial}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-display truncate text-base font-semibold">{m.display_name ?? "Member"}</h3>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <Badge variant="outline" className="gap-1 text-[10px]"><Sparkles className="h-2.5 w-2.5" />{m.xp ?? 0} XP</Badge>
+                    <Badge variant="outline" className="text-[10px]">🔥 {m.streak_days ?? 0}d</Badge>
+                  </div>
+                </div>
+              </div>
+              {m.bio && <p className="mt-3 line-clamp-3 text-xs text-muted-foreground">{m.bio}</p>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

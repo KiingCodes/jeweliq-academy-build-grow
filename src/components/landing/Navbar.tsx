@@ -28,9 +28,12 @@ export function Navbar() {
           <Logo className="h-10 w-auto" />
         </Link>
         <nav className="hidden items-center gap-7 text-sm text-muted-foreground md:flex">
-          <Link to="/courses" className="hover:text-foreground transition-colors">Courses</Link>
-          <Link to="/community" className="hover:text-foreground transition-colors">Community</Link>
-          <Link to="/tutor" className="hover:text-foreground transition-colors">AI Coach</Link>
+          <Link to="/courses" className="hover:text-foreground transition-colors">
+            Courses
+          </Link>
+          <Link to="/community" className="hover:text-foreground transition-colors">
+            Community
+          </Link>
         </nav>
         <div className="flex items-center gap-2">
           {user ? (
@@ -42,14 +45,21 @@ export function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem asChild>
-                  <Link to="/dashboard"><LayoutDashboard className="mr-2 h-4 w-4" />Dashboard</Link>
+                  <Link to="/dashboard">
+                    <LayoutDashboard className="mr-2 h-4 w-4" />
+                    Dashboard
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/dashboard"><UserIcon className="mr-2 h-4 w-4" />Profile</Link>
+                  <Link to="/dashboard">
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    Profile
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={signOut}>
-                  <LogOut className="mr-2 h-4 w-4" />Sign out
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -58,7 +68,11 @@ export function Navbar() {
               <Button variant="ghost" size="sm" className="hidden sm:inline-flex" asChild>
                 <Link to="/login">Sign in</Link>
               </Button>
-              <Button size="sm" className="bg-gradient-brand text-primary-foreground border-0 shadow-soft" asChild>
+              <Button
+                size="sm"
+                className="bg-gradient-brand text-primary-foreground border-0 shadow-soft"
+                asChild
+              >
                 <Link to="/signup">Get started</Link>
               </Button>
             </>
