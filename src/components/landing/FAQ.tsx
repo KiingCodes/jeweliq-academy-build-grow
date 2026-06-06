@@ -1,18 +1,45 @@
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const faqs = [
-  { q: "Do I need any business experience?", a: "Not at all. JewelIQ is built for total beginners — but our advanced tracks will sharpen seasoned founders too." },
-  { q: "How does the AI coach work?", a: "Brainstorm offers, write sales copy, plan content calendars, debug funnels, and pressure-test your strategy — all inside the platform." },
-  { q: "Are the certificates recognized?", a: "Every certificate has a unique ID and a public verification page. Add them to LinkedIn, proposals, and your About page with confidence." },
-  { q: "How long does each course take?", a: "Most courses are 3–6 hours of focused content plus exercises. Go at your pace — your progress is saved across devices." },
-  { q: "Will this work for my country / language?", a: "The frameworks work globally. We teach principles, not local hacks — and learners ship from 60+ countries." },
+  {
+    q: "Do I need any business experience?",
+    a: "Not at all. Jewel IT is built for total beginners - but our advanced tracks will sharpen seasoned founders too.",
+  },
+  {
+    q: "What will I learn at Jewel IT Academy?",
+    a: "You'll learn practical coding & tech skills including web development, Software engineering, mobile app development, digital entrepreneurship and morden technologies like  AI & cloud computing, depending on your program level. ",
+  },
+  {
+    q: "Will I get a certificate?",
+    a: "Yes. Students receive a certificate of completion after successfully finishing their program.",
+  },
+  {
+    q: "How long are the courses?",
+    a: "Course duration depends on the program level, but all courses are structured to ensure strong practical skill development within a focused timeframe. ",
+  },
+  {
+    q: "Will I be job ready after completing a course?",
+    a: "Yes. Our training is focused on industry-relevent skills, real projects and problem-solving, helping you prepare for roles in software development, freelancing, or entrepreneurship.",
+  },
+  {
+    q: "Who teaches the courses?",
+    a: "You'll be taught by experienced developers and tech professionals who understand real-world industry expectations & modern technologies.",
+  },
 ];
 
 export function FAQ() {
   return (
     <section id="faq" className="py-24 sm:py-32">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
-        <h2 style={{ fontFamily: "var(--font-hero)" }} className="text-center text-3xl font-medium tracking-tight sm:text-4xl">
+        <h2
+          style={{ fontFamily: "var(--font-hero)" }}
+          className="text-center text-3xl font-medium tracking-tight sm:text-4xl"
+        >
           Frequently asked <em className="text-gradient">questions</em>
         </h2>
         <Accordion type="single" collapsible className="mt-10">

@@ -45,6 +45,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { useRoles } from "@/hooks/use-roles";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,64 +80,99 @@ const slugify = (s: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
+type AdminUser = {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  xp: number;
+  streak_days: number;
+  created_at: string;
+  roles: string[];
+};
+
+type AssessmentAttempt = {
+  id: string;
+  score: number;
+  total: number;
+  passed: boolean;
+  created_at: string;
+  user_id: string;
+  lesson_id: string;
+  profiles?: { display_name: string | null; avatar_url: string | null };
+  lessons?: { title: string | null; courses?: { title: string | null } };
+};
+
+type EnrollmentRequest = {
+  id: string;
+  full_name: string | null;
+  email: string | null;
+  message: string | null;
+  status: string;
+  created_at: string;
+  user_id: string | null;
+  course_id: string | null;
+  courses?: { title: string | null };
+};
+
+type CertificateRow = Database["public"]["Tables"]["certificates"]["Row"] & {
+  profiles?: { display_name: string | null };
+  courses?: { title: string | null };
+};
+
 function AdminDashboard() {
   const { isAdmin, isLoading } = useRoles();
   const qc = useQueryClient();
+
+  const togglePublish = async (courseId: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from("courses")
+      .update({ is_published: !currentStatus })
+      .eq("id", courseId);
+
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+
+    toast.success(currentStatus ? "Course unpublished" : "Course published");
+
+    qc.invalidateQueries({
+      queryKey: ["admin-courses"],
+    });
+  };
 
   const { data: stats } = useQuery({
     queryKey: ["admin-stats"],
     enabled: isAdmin,
     queryFn: async () => {
-      const [{ count: courses }, { count: profiles }, { count: enrollments }, { count: certs }] =
-        await Promise.all([
-          supabase.from("courses").select("*", { count: "exact", head: true }),
-          supabase.from("profiles").select("*", { count: "exact", head: true }),
-          supabase.from("enrollments").select("*", { count: "exact", head: true }),
-          supabase.from("certificates").select("*", { count: "exact", head: true }),
-        ]);
-      return {
-        courses: courses ?? 0,
-        users: profiles ?? 0,
-        enrollments: enrollments ?? 0,
-        certs: certs ?? 0,
-      };
-
       const [
         { count: courses },
         { count: profiles },
         { count: enrollments },
         { count: certs },
-        { count: reqs },
+        { count: pending },
       ] = await Promise.all([
         supabase.from("courses").select("*", { count: "exact", head: true }),
         supabase.from("profiles").select("*", { count: "exact", head: true }),
         supabase.from("enrollments").select("*", { count: "exact", head: true }),
-        supabase.from("certificates" as never).select("*", { count: "exact", head: true }),
-        supabase
-          .from("enrollment_requests" as never)
-          .select("*", { count: "exact", head: true })
-          .eq("status", "pending"),
+        supabase.from("certificates").select("*", { count: "exact", head: true }),
+        supabase.from("enrollment_requests").select("*", { count: "exact", head: true }),
       ]);
+
       return {
         courses: courses ?? 0,
         users: profiles ?? 0,
         enrollments: enrollments ?? 0,
         certs: certs ?? 0,
-        pending: reqs ?? 0,
+        pending: pending ?? 0,
       };
     },
   });
 
-  const { data: users } = useQuery({
+  const { data: users } = useQuery<AdminUser[]>({
     queryKey: ["admin-users"],
     enabled: isAdmin,
     queryFn: async () => {
-      const { data: profiles } = await supabase
-        .from("profiles")
-        .select("id, display_name, xp, streak_days, created_at")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
       const { data: profiles } = await supabase
         .from("profiles")
         .select("id, display_name, avatar_url, xp, streak_days, created_at")
@@ -155,12 +191,6 @@ function AdminDashboard() {
   });
 
   const { data: courses } = useQuery({
-    queryKey: ["admin-courses"],
-    enabled: isAdmin,
-    queryFn: async () =>
-      (await supabase.from("courses").select("*").order("created_at", { ascending: false })).data ??
-      [],
-
     queryKey: ["admin-courses"],
     enabled: isAdmin,
     queryFn: async () =>
@@ -445,7 +475,7 @@ function AdminDashboard() {
 }
 
 /* ===================== Users Panel ===================== */
-function UsersPanel({ users, qc }: { users: any[]; qc: ReturnType<typeof useQueryClient> }) {
+function UsersPanel({ users, qc }: { users: AdminUser[]; qc: ReturnType<typeof useQueryClient> }) {
   const [search, setSearch] = useState("");
   const filtered = users.filter(
     (u) =>
@@ -576,7 +606,7 @@ function UsersPanel({ users, qc }: { users: any[]; qc: ReturnType<typeof useQuer
 
 /* ===================== Assessments Panel ===================== */
 function AssessmentsPanel() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading } = useQuery<AssessmentAttempt[]>({
     queryKey: ["admin-attempts"],
     queryFn: async () => {
       const { data } = await supabase
@@ -586,7 +616,7 @@ function AssessmentsPanel() {
         )
         .order("created_at", { ascending: false })
         .limit(200);
-      return (data ?? []) as any[];
+      return (data ?? []) as AssessmentAttempt[];
     },
   });
   if (isLoading) return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />;
@@ -664,18 +694,18 @@ function AssessmentsPanel() {
 /* ===================== Enrollment Requests ===================== */
 function RequestsPanel() {
   const qc = useQueryClient();
-  const { data: requests, isLoading } = useQuery({
+  const { data: requests, isLoading } = useQuery<EnrollmentRequest[]>({
     queryKey: ["admin-requests"],
     queryFn: async () => {
       const { data } = await supabase
         .from("enrollment_requests" as never)
         .select("*, courses(title)")
         .order("created_at", { ascending: false });
-      return (data ?? []) as any[];
+      return (data ?? []) as EnrollmentRequest[];
     },
   });
 
-  const approve = async (r: any) => {
+  const approve = async (r: EnrollmentRequest) => {
     if (!r.user_id)
       return toast.error(
         "This request has no linked account. Ask the user to sign up first, then enroll manually.",
@@ -787,19 +817,19 @@ function RequestsPanel() {
 }
 
 /* ===================== Certificates Manual Issue ===================== */
-function CertificatesPanel({ users, courses }: { users: any[]; courses: any[] }) {
+function CertificatesPanel({ users, courses }: { users: AdminUser[]; courses: Course[] }) {
   const qc = useQueryClient();
   const [userId, setUserId] = useState("");
   const [courseId, setCourseId] = useState("");
 
-  const { data: certs, isLoading } = useQuery({
+  const { data: certs, isLoading } = useQuery<CertificateRow[]>({
     queryKey: ["admin-certs"],
     queryFn: async () => {
       const { data } = await supabase
         .from("certificates" as never)
         .select("*, courses(title), profiles(display_name)")
         .order("issued_at", { ascending: false });
-      return (data ?? []) as any[];
+      return (data ?? []) as CertificateRow[];
     },
   });
 

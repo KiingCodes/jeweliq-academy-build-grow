@@ -15,11 +15,6 @@ export function Hero() {
       />
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="glass mx-auto mb-7 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium text-muted-foreground">
-            <Sparkles className="h-3.5 w-3.5 text-[color:var(--accent-orange)]" />
-            The premium academy for modern founders
-          </div>
-
           <h1
             style={{
               fontFamily: "var(--font-hero)",
@@ -39,16 +34,14 @@ export function Hero() {
             <br className="hidden sm:block" /> from anywhere.
           </h1>
           <p className="mx-auto mt-7 max-w-xl text-base text-muted-foreground sm:text-lg">
-            JewelIQ Academy is the premium platform for digital entrepreneurs. Master the mindset,
-            marketing, and money systems behind every successful online business — with expert
-            lessons, an AI coach, and a community of doers. Build your
-            <br className="hidden sm:block" />
-            <span className="text-gradient">online empire.</span>
+            Turn your passion for Technology into a Career. Join a new generation of Innovators,
+            Developers and Entrepreneurs. Learn the skills, mindset and strategies to build a
+            successful online business and achieve financial freedom.
           </p>
 
           <p className="mx-auto mt-7 max-w-xl text-base text-muted-foreground sm:text-lg">
-            JewelIQ Academy is where digital entrepreneurs learn the mindset, marketing, and money
-            systems behind successful online businesses.
+            Whether you want to build software, launch a startup, or advance your career, Jewel IT
+            Academy provides the skills and support to help you achieve your goals.
           </p>
           <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
             <Button
@@ -68,24 +61,6 @@ export function Hero() {
           <p className="mt-4 text-xs text-muted-foreground">
             Enrollment-based access · Cohort programs
           </p>
-        </div>
-
-        <div className="relative mx-auto mt-20 grid max-w-4xl grid-cols-3 gap-4 text-center">
-          {[
-            { k: "10k+", v: "Founders learning" },
-            { k: "8", v: "Premium courses" },
-            { k: "24/7", v: "AI coaching" },
-          ].map((s) => (
-            <div key={s.v} className="glass rounded-2xl p-5">
-              <div
-                style={{ fontFamily: "var(--font-hero)" }}
-                className="text-3xl font-medium text-gradient sm:text-4xl"
-              >
-                {s.k}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground sm:text-sm">{s.v}</div>
-            </div>
-          ))}
         </div>
       </div>
     </section>
